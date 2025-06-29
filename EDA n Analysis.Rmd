@@ -3,11 +3,7 @@ title: "EDA n Analysis"
 author: "quanggiang169"
 date: "2025-05-16"
 output: 
-    github_document:
-    toc: true           
-    toc_depth: 3        
-    toc_float: true     
-    number_sections: true 
+    html_document
 ---
 
 # A. Data cleanning
