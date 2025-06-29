@@ -1,0 +1,2726 @@
+---
+title: "EDA n Analysis"
+author: "quanggiang169"
+date: "2025-05-16"
+output: html_document
+---
+
+# A. Data cleanning
+## 1. Loading libraries
+```{r , include=FALSE}
+library(tidyverse)
+library(janitor)
+library(stringr)
+library(dplyr)
+library(e1071)
+library(knitr)
+library(tibble)
+library(kableExtra)
+library(ggplot2)
+library(gridExtra)
+library(ggcorrplot)
+library(reshape2)
+library(ggpubr)
+library(rlang)
+library(rstatix)
+library(rcompanion)
+library(DescTools)
+library(scales)
+library(broom)
+library(vip)
+library(ranger)
+library(caret)
+```
+library(tidyverse)
+library(janitor)
+library(stringr)
+library(dplyr)
+library(e1071)
+library(knitr)
+library(tibble)
+library(kableExtra)
+library(ggplot2)
+library(gridExtra)
+library(ggcorrplot)
+library(reshape2)
+library(ggpubr)
+library(rlang)
+library(rstatix)
+library(rcompanion)
+library(DescTools)
+library(scales)
+library(car)
+library(broom)
+library(vip)
+library(ranger)
+library(caret)
+
+## 2. Loading data set
+```{r}
+df_hratt <- read_csv("hr_attrition_data.csv",col_types = cols())
+```
+
+## 3. Previewing the first 10 rows of the dataset
+```{r echo=FALSE}
+kable(head(df_hratt, 10))
+```
+
+## 4. Renaming columns
+```{r echo=FALSE}
+df_hratt_v2 <- clean_names(df_hratt)
+```
+I also used the `clean_names` function from the `janitor` package to standardize the column names. This helps ensure consistency by converting all column names to lowercase and replacing spaces or special characters with underscores, making the data easier to work with throughout the analysis.
+
+## 5. Data Dictionary
+The IBM HR Analytics Employee Attrition & Performance dataset is a fictional dataset created by IBM data scientists. Since not all features have descriptions, I have made interpretations of what they represent.
+
+You can find the dataset [here](https://www.kaggle.com/pavansubhasht/ibm-hr-analytics-attrition-dataset).
+
+| Feature Name                   | Data Type          | Description                                                                                          |
+|--------------------------------|--------------------|------------------------------------------------------------------------------------------------------|
+| Age                            | integer             | Employee's age in years                                                                              |
+| Attrition                     | factor              | If the employee stayed or left the company (Yes ; No)                                              |
+| BusinessTravel                 | factor              | How often the employee has business travel (Travel_Rarely ; Travel_Frequently ; Non-Travel)        |
+| DailyRate                     | integer             | Employee's daily rate in USD.                                                                        |
+| Department                     | factor              | Which department the employee belongs to (Sales ; Research & Development ; Human Resources)        |
+| DistanceFromHome              | integer             | How far the employee lives from work in kilometers.                                                 |
+| Education                      | integer             | Employee's education level (1 = Below College ; 2 = College ; 3 = Bachelor ; 4 = Master ; 5 = Doctor)|
+| EducationField                 | factor              | Employee's education field (Life Sciences ; Medical ; Marketing ; Technical Degree, Human Resources ; Other)|
+| EmployeeCount                  | integer             | How many employees the current record represents.                                                   |
+| EmployeeNumber                 | integer             | Employee's unique identification number                                                              |
+| EnvironmentSatisfaction        | integer             | How satisfied the employee is with the company's environment (1 = Low ; 2 = Medium ; 3 = High ; 4 = Very High) |
+| Gender                         | factor              | Employee's gender (Female ; Male)                                                                    |
+| HourlyRate                    | integer             | Employee's hourly rate in USD                                                                        |
+| JobInvolvement                 | integer             | How involved the employee feels with his/her job (1 = Low ; 2 = Medium ; 3 = High ; 4 = Very High) |
+| JobLevel                       | integer             | Employee's job level (1 = Junior ; 2 = Mid ; 3 = Senior ; 4 = Manager ; 5 = Director)             |
+| JobRole                       | factor              | Employee's job role (Sales Executive ; Research Scientist ; Laboratory Technician ; Manufacturing Director ; Healthcare Representative ; Manager ; Sales Representative ; Research Director ; Human Resources) |
+| JobSatisfaction                | integer             | How satisfied the employee feels with his/her job (1 = Low ; 2 = Medium ; 3 = High ; 4 = Very High) |
+| MaritalStatus                  | factor              | Employee's marital status (Single ; Married ; Divorced)                                            |
+| MonthlyIncome                  | integer             | Employee's monthly income in USD                                                                      |
+| MonthlyRate                    | integer             | Employee's monthly rate in USD                                                                        |
+| NumCompaniesWorked             | integer             | Number of companies that the employee has already worked.                                           |
+| Over18                         | factor              | If the employee is over 18 years old (Yes)                                                          |
+| OverTime                       | factor              | If the employee makes overtime (Yes ; No)                                                            |
+| PercentSalaryHike             | integer             | The percentage of the amount a salary is increased                                                  |
+| PerformanceRating              | integer             | Employee's performance rating (1 = Low ; 2 = Good ; 3 = Excellent ; 4 = Outstanding)                |
+| RelationshipSatisfaction       | integer             | How satisfied the employee feels with the relationship with his/her manager (1 = Low ; 2 = Medium ; 3 = High ; 4 = Very High) |
+| StandardHours                  | integer             | Employee's standard hours of work per day                                                            |
+| StockOptionLevel               | integer             | Employee's stock option level (refer to: What You Should Know About Option Trading Levels)           |
+| TotalWorkingYears              | integer             | Total years that the employee has professionally worked                                              |
+| TrainingTimesLastYear         | integer             | Total times that the employee had a training session the last year                                   |
+| WorkLifeBalance                | integer             | How the employee feels about his/her work-life balance (1 = Bad ; 2 = Good ; 3 = Better ; 4 = Best) |
+| YearsAtCompany                 | integer             | Total years that the employee has worked at the company                                             |
+| YearsInCurrentRole            | integer             | Total years that the employee has worked in his/her current job role                                 |
+| YearsSinceLastPromotion        | integer             | Total years since the employee had his/her last promotion at the company                            |
+| YearsWithCurrManager           | integer             | Total years that the employee has worked under his/her current manager                                |
+
+## 6. Checking data dimensions
+```{r echo = FALSE}
+# Print the number of rows and columns in the data frame
+cat('Number of rows:', nrow(df_hratt_v2), '\n')
+cat('Number of cols:', ncol(df_hratt_v2), '\n')
+```
+
+## 7. Checking data types
+```{r echo = FALSE}
+# Identify character columns
+char_cols <- sapply(df_hratt_v2, is.character)
+
+# Convert character columns to factor
+df_hratt_v2[char_cols] <- lapply(df_hratt_v2[char_cols], as.factor)
+
+# Display the structure of the dataframe after conversion
+str(df_hratt_v2)
+
+# Count the number of columns for each data type after conversion
+dtype_counts <- table(sapply(df_hratt_v2, class))
+cat("Count of columns by data type:\n")
+print(dtype_counts)
+```
+After checking the data types, I found that the dataset contains two main types of variables: factor, representing ordinal categorical data, and numeric, which includes both continuous data and some ordinal categorical variables encoded as numbers. This distinction is important because it guides my analysis approach. For factor variables, I will focus on frequency counts and mode-based summaries, while for numeric variables, I will apply statistical measures such as mean, median, and standard deviation. 
+Additionally, I need to be cautious with numeric variables that actually represent ordinal categories and treat them as categorical to avoid misleading interpretations.
+
+## 8. Checking missing data
+```{r echo = FALSE}
+# Count the number of missing values in each column of the data frame
+missing_values <- colSums(is.na(df_hratt_v2))
+print(missing_values)
+```
+
+## 9. Checking duplicate data
+```{r echo = FALSE}
+# Print the number of duplicate rows in the data frame
+num_duplicates <- sum(duplicated(df_hratt_v2))
+cat('Number of duplicate rows:', num_duplicates, '\n')
+```
+
+## 10. Trim whitespace from character columns
+```{r echo=FALSE}
+# Identify factor columns
+factor_cols <- sapply(df_hratt_v2, is.factor)
+
+# Trim whitespace for factor columns
+df_hratt_v2[factor_cols] <- lapply(df_hratt_v2[factor_cols], function(x) {
+  factor(str_trim(as.character(x)))
+})
+```
+I have trimmed leading and trailing whitespace characters from all character columns to ensure data consistency and prevent errors during analysis.
+
+## 11. Feature Engineering
+### 11.1. Column filtering
+```{r echo = FALSE}
+# Define columns to drop
+cols_drop <- c('over18', 'standard_hours', 'employee_count', 'employee_number')
+
+# Drop the columns
+df_hratt_v2 <- df_hratt_v2[, !(names(df_hratt_v2) %in% cols_drop)]
+
+# Select a random sample row as a tibble for nicer formatting
+sample_row <- as_tibble(df_hratt_v2[sample(nrow(df_hratt_v2), 1), ])
+
+# Print the sample row as a table
+kable(sample_row, caption = "Random Sample from Cleaned Dataset")
+```
+The dataset contains several columns that do not add value to the analysis:
+
+| Column Name      | Reason for Removal                                               |
+|------------------|-----------------------------------------------------------------|
+| `over18`         | All employees are over 18, so this column has no variation.     |
+| `standard_hours` | Same standard working hours for all employees, no differentiation. |
+| `employee_count` | Constant total number of employees, offers no unique insight.   |
+| `employee_number`| Serves as an ID, but does not contribute to analysis or prediction.|
+
+To simplify the dataset and focus on relevant features for analyzing employee attrition, these columns are removed.
+
+### 11.2. Label Encoding to Categorical Mapping
+```{r echo=FALSE}
+# Convert education levels
+df_hratt_v2 <- df_hratt_v2 %>%
+  mutate(education = as.factor(recode(education, 
+                                      `1` = "Below College", 
+                                      `2` = "College", 
+                                      `3` = "Bachelor", 
+                                      `4` = "Master", 
+                                      `5` = "Doctor")))
+
+# Convert environment satisfaction levels
+df_hratt_v2 <- df_hratt_v2 %>%
+  mutate(environment_satisfaction = as.factor(recode(environment_satisfaction, 
+                                                     `1` = "Low", 
+                                                     `2` = "Medium", 
+                                                     `3` = "High", 
+                                                     `4` = "Very High")))
+
+# Convert job involvement levels
+df_hratt_v2 <- df_hratt_v2 %>%
+  mutate(job_involvement = as.factor(recode(job_involvement, 
+                                            `1` = "Low", 
+                                            `2` = "Medium", 
+                                            `3` = "High", 
+                                            `4` = "Very High")))
+
+# Convert job levels
+df_hratt_v2 <- df_hratt_v2 %>%
+  mutate(job_level = as.factor(recode(job_level, 
+                                      `1` = "Junior", 
+                                      `2` = "Mid", 
+                                      `3` = "Senior", 
+                                      `4` = "Manager", 
+                                      `5` = "Director")))
+
+# Convert job satisfaction levels
+df_hratt_v2 <- df_hratt_v2 %>%
+  mutate(job_satisfaction = as.factor(recode(job_satisfaction, 
+                                             `1` = "Low", 
+                                             `2` = "Medium", 
+                                             `3` = "High", 
+                                             `4` = "Very High")))
+
+# Convert performance rating levels
+df_hratt_v2 <- df_hratt_v2 %>%
+  mutate(performance_rating = as.factor(recode(performance_rating, 
+                                               `1` = "Low", 
+                                               `2` = "Good", 
+                                               `3` = "Excellent", 
+                                               `4` = "Outstanding")))
+
+# Convert relationship satisfaction levels
+df_hratt_v2 <- df_hratt_v2 %>%
+  mutate(relationship_satisfaction = as.factor(recode(relationship_satisfaction, 
+                                                      `1` = "Low", 
+                                                      `2` = "Medium", 
+                                                      `3` = "High", 
+                                                      `4` = "Very High")))
+
+# Convert work life balance levels
+df_hratt_v2 <- df_hratt_v2 %>%
+  mutate(work_life_balance = as.factor(recode(work_life_balance, 
+                                              `1` = "Bad", 
+                                              `2` = "Good", 
+                                              `3` = "Better", 
+                                              `4` = "Best")))
+```
+This step converts several numeric variables representing categorical information into factors with meaningful labels. Doing so improves clarity and interpretability when analyzing or visualizing the data.
+
+| Variable Name            | Original Codes | Recoded Labels                            | Description                          |
+|-------------------------|----------------|------------------------------------------|------------------------------------|
+| `education`             | 1, 2, 3, 4, 5  | Below College, College, Bachelor, Master, Doctor | Levels of educational attainment    |
+| `environment_satisfaction` | 1, 2, 3, 4     | Low, Medium, High, Very High              | Satisfaction with work environment  |
+| `job_involvement`       | 1, 2, 3, 4     | Low, Medium, High, Very High              | Degree of job involvement            |
+| `job_level`             | 1, 2, 3, 4, 5  | Junior, Mid, Senior, Manager, Director   | Hierarchical job position levels    |
+| `job_satisfaction`      | 1, 2, 3, 4     | Low, Medium, High, Very High              | Satisfaction with the job            |
+| `performance_rating`    | 1, 2, 3, 4     | Low, Good, Excellent, Outstanding         | Performance evaluation ratings      |
+| `relationship_satisfaction` | 1, 2, 3, 4  | Low, Medium, High, Very High              | Satisfaction with workplace relationships |
+| `work_life_balance`     | 1, 2, 3, 4     | Bad, Good, Better, Best                    | Quality of work-life balance         |
+
+Each variable is recoded from numeric codes into descriptive factor levels to facilitate better data understanding and analysis.
+
+### 11.3. Checkpoint
+```{r echo=FALSE}
+# Save the current data set state
+write.csv(df_hratt_v2, file = "hr_attrition_data_v2.csv", row.names = FALSE)
+```
+This step saves the cleaned and processed dataset to a CSV file named `"hr_attrition_data_v2.csv"`. Saving the file ensures that the current version of the data can be easily accessed and reused for future analysis without repeating earlier processing steps.
+
+# B. Descriptive statistics
+## 1. Univariate Analysis
+```{r echo=FALSE}
+#selects only numerical attributes
+num_attributes <- df_hratt_v2 %>% select(where(is.numeric))
+#selects only categorical attributes
+cat_attributes <- df_hratt_v2 %>% select(where(negate(is.numeric)))
+```
+
+### 1.1. Univariate Analysis: Numerical Variables
+```{r, echo=FALSE}
+# Calculate central tendency: mean, median
+mean_values <- colMeans(num_attributes, na.rm = TRUE)
+median_values <- apply(num_attributes, 2, median, na.rm = TRUE)
+
+# Calculate distribution: std, min, max, range, skew, kurtosis
+std_values <- apply(num_attributes, 2, sd, na.rm = TRUE)
+min_values <- apply(num_attributes, 2, min, na.rm = TRUE)
+max_values <- apply(num_attributes, 2, max, na.rm = TRUE)
+range_values <- max_values - min_values
+skewness_values <- apply(num_attributes, 2, function(x) skewness(x, na.rm = TRUE))
+kurtosis_values <- apply(num_attributes, 2, function(x) kurtosis(x, na.rm = TRUE))
+
+# Create summary statistics table
+summary_stats <- data.frame(
+  attributes = names(num_attributes),
+  min = min_values,
+  max = max_values,
+  range = range_values,
+  mean = mean_values,
+  median = median_values,
+  std = std_values,
+  skewness = skewness_values,
+  kurtosis = kurtosis_values
+)
+
+# Display the summary statistics table
+kable(summary_stats, format = "simple", row.names = FALSE)
+```
+
+```{r histogram-plotting-num, echo=FALSE, fig.width=10, fig.height=8}
+# Set up to show two plots per row
+par(mfrow = c(2, 2), mar = c(5, 5, 4, 2) + 0.1, oma = c(2, 2, 2, 2))
+
+# Loop through each numerical attribute to create a clear histogram
+for (col in names(num_attributes)) {
+  hist(num_attributes[[col]], 
+       main = paste("Histogram of", col), 
+       xlab = col, 
+       col = "lightblue", 
+       breaks = 30,
+       cex.main = 1.5,    # Title size for readability
+       cex.lab = 1.3,     # Label size
+       cex.axis = 1.2,    # Axis size
+       border = "darkblue", 
+       las = 1)           # Make axis labels horizontal for clarity
+}
+
+# Reset layout after plotting
+par(mfrow = c(1, 1))
+```
+
+| **Key Findings** | **Explanation** |
+|------------------|-----------------|
+| **Age**: Approximately symmetric distribution with slight right skewness (skewness ~0.41), median age is 36 years | Most employees are middle-aged; age distribution is fairly balanced without strong skew. |
+| **Daily Rate & Hourly Rate**: Nearly symmetric distributions with very small skewness (close to 0) | Compensation rates per day and hour are fairly evenly distributed without extreme low or high values. |
+| **Distance from Home**: Right skewed (skewness ~0.96), indicating many employees live close to the workplace and fewer live farther away | Majority of employees live near the office; a small number reside at greater distances. |
+| **Monthly Income**: Noticeably right skewed (skewness ~1.37) with positive kurtosis (~1), indicating a long tail on the high-income side | Many employees earn low to medium income, with a few earning significantly higher incomes. |
+| **Number of Companies Worked**: Right skewed (skewness ~1.02), suggesting most employees have worked at few companies | Majority of employees have limited job-hopping experience; few have worked at multiple companies. |
+| **Percent Salary Hike**: Mild right skew (skewness ~0.82) | Most salary increases are moderate, with a few instances of higher raises. |
+| **Years at Company** and **Years Since Last Promotion**: Strong right skewness (skewness ~1.76 and ~1.98) with high kurtosis (3.9 and 3.6 respectively) | Many employees are relatively new or have been promoted recently; a smaller group has long tenure and longer duration since last promotion. |
+| **Other variables (stock option level, training times last year, years in current role, years with current manager)**: Slight to moderate right skew | These variables mostly concentrate at lower to medium values, with fewer high-value cases. |
+
+**Summary**
+
+- Time-related variables (tenure, promotion history, salary hike) show right-skewed distributions, reflecting that most employees are clustered at lower to medium values, with a small group exhibiting higher values.  
+- Monthly income and distance from home also show right skewness with long right tails.  
+- Compensation rates (daily and hourly) are more symmetrically distributed.
+
+### 1.2. Univariate Analysis: Categorical Variables
+#### 1.2.1. Check Unique Value Counts for Categorical Attributes
+```{r, echo=FALSE}
+# Create a data frame with variable name, number of unique values, and the unique values themselves
+unique_summary <- data.frame(
+  `no.unique values` = sapply(cat_attributes, function(x) length(unique(x))),
+  `unique values` = sapply(cat_attributes, function(x) paste(unique(x), collapse = ", "))
+)
+
+# Print the table nicely using kable
+kable(unique_summary, caption = "Summary of Unique Values in Categorical Variables")
+```
+
+#### 1.2.2 Frequency Distribution of Categorical Variables
+This section provides a descriptive overview of the categorical variables in the dataset to establish a foundational understanding of the employee profile and organizational characteristics.
+
+```{r frequency-tables-cat, echo=FALSE, results='asis'}
+# Function to create and print a frequency table with counts and percentages
+print_freq_table <- function(vec, var_name) {
+  counts <- table(vec)                     # Calculate counts of each category
+  props <- prop.table(counts) * 100        # Calculate percentage for each category
+  freq_table <- data.frame(
+    Category = names(counts),               # Category names
+    Count = as.vector(counts),              # Counts as numeric vector
+    Percentage = round(as.vector(props), 2) # Percentages rounded to 2 decimals
+  )
+  
+  # Print a header for the frequency table
+  cat("### Frequency Table for", var_name, "\n")
+  
+  # Generate a formatted table with caption and column names
+  kable(freq_table, 
+        caption = paste("Distribution of", var_name),
+        col.names = c("Category", "Count", "Percentage (%)"),
+        align = c("l", "r", "r")) %>%
+    kable_styling(full_width = FALSE, position = "left") %>% # Styling the table for better display
+    print()  # Print the table to the output
+  
+  cat("\n")  # Add a line break after each table for spacing
+}
+
+# Loop through all categorical variables to print frequency tables
+for (i in seq_along(cat_attributes)) {
+  print_freq_table(cat_attributes[[i]], names(cat_attributes)[i])
+}
+```
+
+```{r histogram-plotting-cat, echo=FALSE, fig.width=14, fig.height=12}
+# Define a custom pastel color palette
+pastel_colors <- c("#1F4E79", "#76B041", "#F4A261", "#2A9D8F", "#E9C46A", "#6A4C93", "#F08A5D")
+
+# Loop through each categorical column to create horizontal count plots
+# Setting up a layout of 3x3 for every 9 plots
+num_plots <- ncol(cat_attributes)
+plots_per_page <- 9
+
+for (i in seq_along(cat_attributes)) {
+  # Check if a new page is needed and set up layout
+  if ((i - 1) %% plots_per_page == 0) {
+    par(mfrow = c(3, 3), mar = c(5, 10, 4, 2) + 0.1, oma = c(2, 2, 2, 2))  # Increased left margin
+  }
+  
+  # Create a table of counts for the category
+  counts <- table(cat_attributes[[i]])
+  colors <- pastel_colors[1:length(counts)]
+  
+  # Create a horizontal bar plot with narrow bars and clear labels
+  barplot(counts, 
+          main = paste("Count for", names(cat_attributes)[i]), 
+          xlab = names(cat_attributes)[i], 
+          col = colors,    
+          border = "darkblue", 
+          cex.main = 1.2,       # Title size for readability
+          cex.lab = 1.1,        # Label size
+          cex.axis = 1.1,       # Axis size
+          cex.names = 1.1,      # Label size on bars
+          horiz = TRUE,         # Horizontal bar plot
+          las = 1,              # Horizontal axis labels
+          space = 1.5,          # Increased spacing between bars
+          width = 0.6)          # Narrower bar width for better spacing
+}
+
+# Reset layout after plotting
+par(mfrow = c(1, 1))
+```
+
+## 2. Coss-variable connections
+### 2.1. Correlation between numerical attributes
+```{r, echo=FALSE, fig.width= 12, fig.height= 6}
+# Calculate the correlation matrix
+correlation <- cor(num_attributes, method = "pearson")
+
+# Plot the correlation heatmap
+ggcorrplot(correlation, 
+           method = "square", 
+           lab = TRUE,               # Display correlation coefficients in cells
+           lab_size = 3,             # Slightly larger font size for better readability
+           colors = c("blue", "white", "orange"),  # High-contrast color palette
+           title = "Correlation Heatmap of Numerical Variables",
+           ggtheme = theme_minimal(base_size = 12),    # Increase base font size for larger plot
+           legend.title = "Correlation") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 10)
+  )
+```
+
+### 2.2. Associations between categorical attributes
+```{r, echo=FALSE, fig.width= 12, fig.height= 6}
+# Function to compute Cramér's V between two categorical variables
+get_cramers_v <- function(x, y) {
+  tbl <- table(x, y)
+  return(DescTools::CramerV(tbl, bias.correct = TRUE))
+}
+
+# Create a matrix of Cramér's V values
+vars <- names(cat_attributes)
+n <- length(vars)
+cramer_matrix <- matrix(NA, nrow = n, ncol = n, dimnames = list(vars, vars))
+
+for (i in seq_len(n)) {
+  for (j in seq_len(n)) {
+    if (i <= j) {
+      cramer_matrix[i, j] <- get_cramers_v(cat_attributes[[i]], cat_attributes[[j]])
+    } else {
+      cramer_matrix[i, j] <- cramer_matrix[j, i]  # Symmetric
+    }
+  }
+}
+
+# Reshape for heatmap
+cramer_long <- melt(cramer_matrix, na.rm = TRUE)
+colnames(cramer_long) <- c("Var1", "Var2", "CramerV")
+
+# Draw the heatmap
+ggplot(cramer_long, aes(x = Var1, y = Var2, fill = CramerV)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", na.value = "white", name = "Cramér's V") +
+  geom_text(aes(label = round(CramerV, 2)), size = 3, color = "white") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank(),
+        axis.title = element_blank(),
+        legend.position = "right")
+```
+
+### 2.3. Interaction Between Numeric and Categorical Variables
+```{r, echo=FALSE, fig.width= 12, fig.height= 6}
+# Combine factor and numeric variables into one data frame
+df <- cbind(cat_attributes, num_attributes)
+
+# Initialize result storage
+results <- data.frame(
+  Factor_Variable = character(),
+  Numeric_Variable = character(),
+  P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Perform Kruskal-Wallis test for each factor-numeric pair
+for (cat_var in colnames(cat_attributes)) {
+  for (num_var in colnames(num_attributes)) {
+    sub_df <- df[, c(cat_var, num_var)] %>% na.omit()
+    formula <- as.formula(paste(num_var, "~", cat_var))
+    
+    test_result <- kruskal.test(formula, data = sub_df)
+    
+    results <- rbind(results, data.frame(
+      Factor_Variable = cat_var,
+      Numeric_Variable = num_var,
+      P_Value = round(test_result$p.value, 5)
+    ))
+  }
+}
+
+# Sort by p-value
+results <- results %>% arrange(P_Value)
+
+# Filter for p-value < 0.05
+significant <- results %>% filter(P_Value < 0.05)
+
+# Display only significant results
+kable(significant, caption = "Statistically Significant Factor-Numeric Relationships (Kruskal-Wallis, p < 0.05)") %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+# C. Inferential Analysis
+## 1. Bivariate Analysis with Attrition
+```{r, include=FALSE}
+#Loading data set
+df_hratt <- read_csv("hr_attrition_data_v2.csv",col_types = cols())
+```
+In this step, I explore how each selected feature relates to employee attrition. Using visualizations, I compare the attrition rate across different groups or ranges of each variable. This helps me identify patterns or potential drivers that may point to HR policies needing improvement.
+
+### 1.1. Compensation & Rewards
+#### 1.1.1. Monthly Income
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+# Divide monthly_income into 10 equal-sized groups (deciles)
+df_hratt_grouped <- df_hratt %>%
+  mutate(income_bin = ntile(monthly_income, 10)) %>%
+  group_by(income_bin) %>%
+  summarise(attrition_rate = mean(attrition == "Yes"))
+
+# Calculate min and max income for each decile
+income_ranges <- df_hratt %>%
+  mutate(income_bin = ntile(monthly_income, 10)) %>%
+  group_by(income_bin) %>%
+  summarise(min_income = min(monthly_income),
+            max_income = max(monthly_income)) %>%
+  mutate(label = paste0("$", format(min_income, big.mark = ","), " – $", format(max_income, big.mark = ",")))
+
+# Merge labels into grouped data
+df_hratt_grouped <- df_hratt_grouped %>%
+  left_join(income_ranges, by = "income_bin")
+
+# Bar chart: Attrition rate across income deciles with labels
+p1 <- ggplot(df_hratt_grouped, aes(x = factor(income_bin), y = attrition_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Attrition Rate across Monthly Income Levels",
+       x = "Monthly Income Range (Deciles)",
+       y = "Attrition Rate") +
+  scale_x_discrete(labels = df_hratt_grouped$label) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(angle = 45, hjust = 1))  # rotate x-axis labels for readability
+
+# Boxplot: Distribution of Monthly Income by Attrition
+p2 <- ggplot(df_hratt, aes(x = attrition, y = monthly_income, fill = attrition)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("lightgray", "blue")) +
+  labs(title = "Monthly Income Distribution by Attrition",
+       x = "Attrition",
+       y = "Monthly Income") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        legend.position = "none")
+
+# Arrange both plots side by side
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+The variable Monthly Income shows a clear relationship with attrition when analyzed through two charts. A bar chart dividing income into 10 deciles indicates that attrition rates are significantly high among the lowest income groups (decile 1 and 2), exceeding 0.3. However, at decile 3, the rate drops sharply to below 0.2—marking a notable turning point. From decile 4 to decile 6, the attrition rate continues to decline gradually, reaching below 0.1. From decile 7 onward, the rate fluctuates slightly, increasing again at decile 9 (around 0.15) before falling dramatically to under 0.05 in decile 10, the highest income group. This suggests that the relationship between income and attrition is not linear, but may be influenced by certain income thresholds that affect employee behavior. The boxplot further supports this insight, showing that the group of employees who left had noticeably lower median, Q1, and Q3 income levels than those who stayed, reflecting a clear trend of higher attrition among low-income employees.
+
+From this analysis, the following hypotheses can be proposed:
+
+- **H0**: The minimum income of 2696 does not affect employees' likelihood of attrition.
+
+- **H1**: The minimum income of 2696 helps reduce employees' likelihood of attrition. **<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create income group based on threshold 2696
+df_hratt <- df_hratt %>%
+  mutate(income_group = ifelse(monthly_income < 2696, "< 2696", ">= 2696"))
+
+# Create contingency table between income group and attrition
+table_income_attrition <- table(df_hratt$income_group, df_hratt$attrition)
+
+# Display the contingency table in a clean format using kable
+knitr::kable(table_income_attrition, caption = "Contingency Table: Income Group vs Attrition")
+
+# Perform Chi-squared test (suitable when expected frequencies are sufficiently large)
+test_result <- chisq.test(table_income_attrition)
+
+# Show the test result
+test_result
+```
+The test results show a Chi-squared statistic of 61.145 with 1 degree of freedom, and a p-value of 5.30 × 10⁻¹⁵, which is significantly less than the 0.05 significance level. This allows us to reject the null hypothesis (H₀), providing statistical evidence that income level is associated with attrition rate.
+
+Specifically, employees earning less than 2,696 have a substantially higher attrition rate (31.3%) compared to those earning 2,696 or more (12.3%). This supports the alternative hypothesis (H₁) that a minimum income level of 2,696 contributes to reducing attrition risk.
+
+#### 1.1.2. Percent Salary Hike
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+# Divide percent_salary_hike into 10 equal-sized groups (deciles)
+df_hratt_grouped <- df_hratt %>%
+  mutate(psh_bin = ntile(percent_salary_hike, 10)) %>%
+  group_by(psh_bin) %>%
+  summarise(attrition_rate = mean(attrition == "Yes"))
+
+# Calculate min and max percent_salary_hike for each decile
+psh_ranges <- df_hratt %>%
+  mutate(psh_bin = ntile(percent_salary_hike, 10)) %>%
+  group_by(psh_bin) %>%
+  summarise(min_psh = min(percent_salary_hike),
+            max_psh = max(percent_salary_hike)) %>%
+  mutate(label = paste0(min_psh, "% – ", max_psh, "%"))
+
+# Merge decile range labels into grouped data
+df_hratt_grouped <- df_hratt_grouped %>%
+  left_join(psh_ranges, by = "psh_bin")
+
+# Bar chart: Attrition rate across psh deciles with range labels
+p1 <- ggplot(df_hratt_grouped, aes(x = factor(psh_bin), y = attrition_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Attrition Rate across Percent Salary Hike Levels",
+       x = "Percent Salary Hike Range (Deciles)",
+       y = "Attrition Rate") +
+  scale_x_discrete(labels = df_hratt_grouped$label) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(angle = 45, hjust = 1))  # rotate x-axis labels for readability
+
+# Boxplot: Distribution of Percent Salary Hike by Attrition
+p2 <- ggplot(df_hratt, aes(x = attrition, y = percent_salary_hike, fill = attrition)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("lightgray", "blue")) +
+  labs(title = "Percent Salary Hike Distribution by Attrition",
+       x = "Attrition",
+       y = "Percent Salary Hike") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        legend.position = "none")
+
+# Arrange both plots side by side
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+The variable Percent Salary Hike shows no clear relationship with attrition when examined through two visualizations. In the bar chart, as Percent Salary Hike increases, the attrition rate fluctuates slightly within a range from below 0.125 to nearly 0.2, without exhibiting a consistent upward or downward trend. This suggests that the annual percentage increase in salary does not serve as a strong predictor of employee attrition. The boxplot reinforces this observation, as the median and Q1 values for both the attrition and non-attrition groups are nearly identical, with only a marginally higher Q3 value for the group that stayed. However, this difference is not substantial enough to indicate a meaningful disparity. Overall, the distribution of salary hike percentages between the two groups does not provide strong evidence that higher raises are effective in improving retention.
+
+#### 1.1.3. Stock Option Level
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+# Calculate attrition rate for each unique stock_option_level
+df_hratt_grouped <- df_hratt %>%
+  group_by(stock_option_level) %>%
+  summarise(attrition_rate = mean(attrition == "Yes"))
+
+# Bar chart: Attrition rate by stock_option_level
+p1 <- ggplot(df_hratt_grouped, aes(x = factor(stock_option_level), y = attrition_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Attrition Rate by Stock Option Level",
+       x = "Stock Option Level",
+       y = "Attrition Rate") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14))
+
+# Boxplot: Distribution of stock_option_level by attrition status
+p2 <- ggplot(df_hratt, aes(x = attrition, y = stock_option_level, fill = attrition)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("lightgray", "blue")) +
+  labs(title = "Stock Option Level Distribution by Attrition",
+       x = "Attrition",
+       y = "Stock Option Level") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        legend.position = "none")
+
+# Display both plots side by side
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+The Stock Option Level variable shows a clear relationship between the level of stock options and the attrition rate. The bar chart on the left indicates that employees without stock options (Stock Option Level = 0) have the highest attrition rate, approximately 0.24. When the stock option level increases to 1, the attrition rate drops sharply to around 0.1, suggesting that having stock options may help reduce attrition. However, at higher levels such as 2 and 3, the attrition rates fluctuate mildly, about 0.075 and 0.175 respectively, not following a strictly decreasing trend.
+
+The boxplot also shows that the median Stock Option Level for employees who did not leave (Attrition = No) is 1, higher than the median of 0 for those who left (Attrition = Yes), while the Q1 and Q3 values for both groups are relatively similar.
+
+From this, we can propose the following hypotheses:
+
+- **H0**:Attrition rate is the same between employees with no stock option (level 0) and employees with at least one stock option (level ≥1).
+
+- **H1**: Employees with no stock option level have higher attrition rate than those with stock option (one-sided test).**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create a binary variable: No Stock Option (0) vs Has Stock Option (1+)
+df_hratt <- df_hratt %>%
+  mutate(stock_option_bin = ifelse(stock_option_level == 0, "No Stock Option", "Has Stock Option"))
+
+# Create contingency table for Chi-squared test
+table_stock_attrition <- table(df_hratt$stock_option_bin, df_hratt$attrition)
+
+# Summarise counts and attrition rates by stock_option_bin
+summary_table <- df_hratt %>%
+  group_by(stock_option_bin) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3)
+  )
+
+# Show summary table with formatting
+summary_table %>%
+  kable(col.names = c("Stock Option Group", "Total Employees", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+        caption = "Attrition Summary by Stock Option Group") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+# Perform Chi-squared test
+chisq_result <- chisq.test(table_stock_attrition)
+
+# Print contingency table and Chi-squared test results
+chisq_result
+```
+The Chi-squared test results show a statistic of 55.025 with 1 degree of freedom and a p-value of 1.19 × 10⁻¹³, which is significantly less than the 0.05 significance level. Therefore, we reject the null hypothesis (H₀), indicating strong statistical evidence to support the alternative hypothesis (H₁): Employees without stock options have a higher attrition rate than those with stock options.
+
+In practice, the attrition rate among employees without stock options is 24.4%, which is approximately 2.5 times higher than that of employees with stock options (9.9%).
+
+### 1.2 Career Development & Advancement
+#### 1.2.1. Job Level
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+df_hratt$job_level <- factor(df_hratt$job_level, 
+                             levels = c("Junior", "Mid", "Senior", "Manager", "Director"))
+# This plot shows the proportion of attrition across each job level
+ggplot(df_hratt, aes(x = job_level, fill = attrition)) + 
+  geom_bar(position = "fill") +  # Show proportions
+  scale_fill_manual(values = c("lightgray", "blue")) + 
+  labs(title = "Attrition Probabilities by Job Level",
+       x = "Job Level",
+       y = "Proportion",
+       fill = "Attrition") +
+  theme_minimal(base_size = 15) +
+  theme(plot.title = element_text(size = 20),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 15))
+```
+The variable Job Level demonstrates a clear relationship between organizational hierarchy and employee attrition. The bar chart shows that employees at lower job levels tend to have significantly higher attrition rates. Specifically, the Junior level has the highest attrition rate at around 0.25, followed by Senior level employees at just over 0.18, and Mid-level employees at approximately 0.15. In contrast, higher-level positions such as Manager and Director have notably low attrition rates, both hovering around 0.09.
+
+This trend may reflect differences in job stability, compensation, or motivation across job levels within the organization.
+
+From these observations, we can propose the following hypotheses:
+
+- **H0**: The attrition rate of the Junior group is not higher than the attrition rate of the other groups.
+
+- **H1**: The attrition rate of the Junior group is higher than the attrition rate of the other groups.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create binary variable: Junior vs Others
+df_hratt <- df_hratt %>%
+  mutate(job_level_binary = ifelse(job_level == "Junior", "Junior", "Others"))
+
+# Create contingency table between binary job_level and attrition
+table_binary_job_attrition <- table(df_hratt$job_level_binary, df_hratt$attrition)
+
+# Perform Chi-squared test instead of Fisher's Exact Test
+chisq_result_binary <- chisq.test(table_binary_job_attrition)
+
+# Summarize counts and attrition rates by binary job_level
+summary_table_binary <- df_hratt %>%
+  group_by(job_level_binary) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3)
+  )
+
+# Display the summary table with formatted layout
+summary_table_binary %>%
+  kable(col.names = c("Job Level Group", "Total Employees", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+        caption = "Attrition Summary: Junior vs Others") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Display Chi-squared Test results
+chisq_result_binary
+```
+The one-sided Chi-squared test results show a statistic of X-squared = 65.219 with 1 degree of freedom and a p-value of 6.701 × 10⁻¹⁶, which is much smaller than the significance level of 0.05. Therefore, we reject the null hypothesis (H₀) and have sufficient statistical evidence to confirm that the Junior group has a significantly higher attrition rate compared to other groups.
+
+Specifically, the attrition rate in the Junior group is 26.3%, while in the other groups it is only 10.1%, meaning the attrition rate in the Junior group is nearly 2.6 times higher.
+
+#### 1.2.2. Years Since Last Promotion
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+# Group data by unique years_since_last_promotion values and calculate attrition rate
+df_hratt_grouped <- df_hratt %>%
+  group_by(years_since_last_promotion) %>%
+  summarise(attrition_rate = mean(attrition == "Yes")) %>%
+  arrange(years_since_last_promotion)
+
+# Bar chart: Attrition rate by years_since_last_promotion
+p1 <- ggplot(df_hratt_grouped, aes(x = factor(years_since_last_promotion), y = attrition_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Attrition Rate by Years Since Last Promotion",
+       x = "Years Since Last Promotion",
+       y = "Attrition Rate") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14))
+
+# Boxplot: Distribution of years_since_last_promotion by attrition status
+p2 <- ggplot(df_hratt, aes(x = attrition, y = years_since_last_promotion, fill = attrition)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("lightgray", "blue")) +
+  labs(title = "Years Since Last Promotion Distribution by Attrition",
+       x = "Attrition",
+       y = "Years Since Last Promotion") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        legend.position = "none")
+
+# Arrange the two plots side by side
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+The chart reveals a complex fluctuation in attrition rates based on the number of years since an employee’s last promotion. During the first 3 years after promotion (0–3 years), attrition rates remain elevated — ranging from 13% to over 17%. This suggests that the early post-promotion period does not guarantee retention. Instead, it may involve two subgroups: those who are disengaged due to unmet expectations and those who feel their promotion has not led to meaningful change or support.
+
+This period (0–3 years) can be considered a “fragile engagement phase,” where employees may still be assessing the real value of their advancement. Without proper career guidance, enriched responsibilities, or recognition beyond the title change, some employees may start seeking external opportunities even shortly after being promoted.
+
+From year 4 to year 5, attrition drops significantly to its lowest level (4–8%), indicating a “stability phase” where employees have settled into their new role, possibly benefiting from accumulated experience, increased competence, or greater internal visibility.
+
+However, starting from year 6, attrition begins to rise again sharply, with noticeable spikes in years 7, 9, and 15 — often exceeding 20%. This pattern suggests a potential “career stagnation zone,” where the absence of new development signals or promotion opportunities may drive employees to leave.
+
+Supporting this interpretation, boxplot analysis shows that both attrition groups share a median of 0 years since promotion — indicating many leavers were either recently promoted or have waited too long. However, the attrition group has a narrower spread, reinforcing the view that people tend to leave at both ends of the post-promotion spectrum.
+
+These findings suggest a psychological lifecycle after promotion: early uncertainty (0–3 years), mid-stage stability (4–5 years), and late-stage disengagement (6+ years).
+
+From this, we can propose the following hypotheses:
+
+- **H0**: There is no significant difference in the number of years since the last promotion between employees who left the company and those who stayed.
+
+- **H1**: There is a significant difference in the number of years since the last promotion between employees who left the company and those who stayed.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Group 'years_since_last_promotion' into categories
+df_hratt <- df_hratt %>%
+  mutate(promotion_group = case_when(
+    years_since_last_promotion <= 3 ~ "0–3 years",
+    years_since_last_promotion >= 4 & years_since_last_promotion <= 5 ~ "4–5 years",
+    TRUE ~ "6+ years"
+  ))
+
+# Create contingency table between promotion group and attrition
+table_promotion_attrition <- table(df_hratt$promotion_group, df_hratt$attrition)
+
+# Perform Chi-square test
+chi_result <- chisq.test(table_promotion_attrition)
+
+# Summarize counts and attrition rates by promotion group
+summary_promotion <- df_hratt %>%
+  group_by(promotion_group) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3)
+  )
+
+# Display summary table
+summary_promotion %>%
+  kable(col.names = c("Promotion Group", "Total Employees", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+        caption = "Attrition by Years Since Last Promotion") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Display Chi-square test result
+chi_result
+```
+The Pearson's Chi-squared test yielded a p-value of 0.02109, which is less than the significance level of 0.05. Therefore, we reject the null hypothesis. This suggests a statistically significant relationship between Years Since Last Promotion and Attrition — meaning the number of years since an employee's last promotion is associated with their likelihood of leaving the company.
+Further analysis on specific subgroups could help identify the most sensitive periods, enabling the development of targeted retention strategies.
+
+#### 1.2.3. Training Times Last Year
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+# Group by unique training_times_last_year values and calculate attrition rate
+df_hratt_grouped <- df_hratt %>%
+  group_by(training_times_last_year) %>%
+  summarise(attrition_rate = mean(attrition == "Yes")) %>%
+  arrange(training_times_last_year)
+
+# Bar chart: Attrition rate by training_times_last_year
+p1 <- ggplot(df_hratt_grouped, aes(x = factor(training_times_last_year), y = attrition_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Attrition Rate by Training Times Last Year",
+       x = "Training Times Last Year",
+       y = "Attrition Rate") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14))
+
+# Boxplot: Distribution of training_times_last_year by attrition status
+p2 <- ggplot(df_hratt, aes(x = attrition, y = training_times_last_year, fill = attrition)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("lightgray", "blue")) +
+  labs(title = "Training Times Last Year Distribution by Attrition",
+       x = "Attrition",
+       y = "Training Times Last Year") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        legend.position = "none")
+
+# Arrange both plots side by side
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+Preliminary analysis suggests that employees who did not participate in any training sessions during the year had a higher attrition rate compared to those who attended at least some training. Meanwhile, employees who participated in 1 to 6 training sessions tended to be more likely to stay, although the differences between these groups were not entirely consistent. This may indicate that training participation is related to employee engagement, though the relationship is not clearly linear.
+
+The boxplot further supports this: the quartiles (Q1, median, Q3) of training times in the attrition group are slightly lower than those in the retention group, but the difference is not substantial. This implies that further statistical analysis is needed to draw a definitive conclusion.
+
+From this, we can propose the following hypotheses:
+
+- **H0**: The attrition rate of employees who received no training (0 times) is not significantly different from that of employees who received training (≥1 time).
+- **H1**:* Employees who received no training have a significantly higher attrition rate.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create binary variable: No Training (0) vs. Had Training (1+)
+df_hratt <- df_hratt %>%
+  mutate(training_group = ifelse(training_times_last_year == 0, "No Training", "Had Training"))
+
+# Create contingency table between training group and attrition
+table_training_attrition <- table(df_hratt$training_group, df_hratt$attrition)
+
+# Perform Chi-squared Test instead of Fisher's Test
+chisq_result <- chisq.test(table_training_attrition)
+
+# Summarize counts and attrition rates
+summary_table <- df_hratt %>%
+  group_by(training_group) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3)
+  )
+
+# Display summary table in formatted style
+summary_table %>%
+  kable(
+    col.names = c("Training Group", "Total Employees", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+    caption = "Attrition Summary by Training Group"
+  ) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Display Chi-squared test results
+chisq_result
+```
+The Chi-squared test with Yates' correction shows a statistic of X-squared = 4.7722, with 1 degree of freedom and a p-value = 0.02892, which is less than the significance level of 0.05. Therefore, we reject the null hypothesis (H₀) and have sufficient statistical evidence to conclude that employees who have not received training have a significantly higher attrition rate compared to those who have received training.
+
+Specifically, the attrition rate among untrained employees is 27.8%, while the attrition rate among trained employees is 15.7%, indicating that the untrained group has nearly double the risk of attrition.
+
+#### 1.2.3. Years In Current Role
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+# Divide years_in_current_role into 10 equal-sized groups (deciles)
+df_hratt_grouped <- df_hratt %>%
+  mutate(yicr_bin = ntile(years_in_current_role, 10)) %>%
+  group_by(yicr_bin) %>%
+  summarise(attrition_rate = mean(attrition == "Yes"))
+
+# Calculate min and max years_in_current_role for each decile
+yicr_ranges <- df_hratt %>%
+  mutate(yicr_bin = ntile(years_in_current_role, 10)) %>%
+  group_by(yicr_bin) %>%
+  summarise(min_yicr = min(years_in_current_role),
+            max_yicr = max(years_in_current_role)) %>%
+  mutate(label = paste0(min_yicr, " – ", max_yicr, " yrs"))
+
+# Merge decile labels into grouped data
+df_hratt_grouped <- df_hratt_grouped %>%
+  left_join(yicr_ranges, by = "yicr_bin")
+
+# Bar chart: Attrition rate across yicr deciles with range labels
+p1 <- ggplot(df_hratt_grouped, aes(x = factor(yicr_bin), y = attrition_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Attrition Rate across YICR Levels",
+       x = "Years In Current Role Range (Deciles)",
+       y = "Attrition Rate") +
+  scale_x_discrete(labels = df_hratt_grouped$label) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Boxplot: Distribution of Years In Current Role by Attrition
+p2 <- ggplot(df_hratt, aes(x = attrition, y = years_in_current_role, fill = attrition)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("lightgray", "blue")) +
+  labs(title = "YICR Distribution by Attrition",
+       x = "Attrition",
+       y = "Years In Current Role") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        legend.position = "none")
+
+# Arrange both plots side by side
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+The variable Years in Current Role reflects how long employees have held their current position and shows a relatively clear relationship with attrition. The bar chart indicates a general downward trend in attrition rates as tenure in the current role increases, though some minor fluctuations exist across deciles. Overall, the early deciles—representing employees who are new to their role or recently transferred—exhibit significantly higher attrition rates compared to the later deciles. This suggests that the initial phase in a new role is a critical period with a higher risk of turnover.
+
+The boxplot reinforces this pattern: the Q1, median, and Q3 values for the attrition group (Yes) are all lower than those for the non-attrition group (No), indicating that most employees who leave the company tend to have shorter tenure in their current roles.
+
+Based on these observations, several hypotheses can be proposed:
+
+- **H0**: There is no relationship in the attrition rate with respect to the number of years in the current role.
+
+- **H1**: The longer the Years In Current Role, the lower the attrition rate.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create a binary attrition variable for convenience (Yes=1, No=0)
+df_hratt <- df_hratt %>%
+  mutate(attrition_bin = ifelse(attrition == "Yes", 1, 0))
+
+# Categorize years_in_current_role into ordered groups: 0-3, 4-5, 6+
+df_hratt <- df_hratt %>%
+  mutate(years_group = case_when(
+    years_in_current_role <= 3 ~ "0-3",
+    years_in_current_role <= 5 ~ "4-5",
+    TRUE ~ "6+"
+  ))
+
+# Create contingency table for years_group and attrition_bin
+table_years_attr <- table(df_hratt$years_group, df_hratt$attrition_bin)
+
+# Perform Cochran-Armitage Trend Test with alternative hypothesis 'decreasing'
+# i.e. attrition rate decreases as years_in_current_role increases
+trend_test <- CochranArmitageTest(table_years_attr, alternative = "one.sided")
+
+# Show the trend test result
+print(trend_test)
+```
+The test results show a very small p-value (p = 7.699e-08), well below the common significance threshold (0.05), along with a positive Z-score (Z = 5.2477). This provides strong evidence to reject the null hypothesis and accept the alternative.
+In other words, there is statistical evidence indicating that the longer employees stay in their current role, the lower their likelihood of attrition. This finding may reflect increasing stability and job satisfaction over time in a given role. It suggests that supporting employees to grow within their current roles may be an effective strategy for improving retention.
+
+### 1.3. Work-Life Balance & Flexibility
+#### 1.3.1. OverTime
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+df_hratt$over_time <- factor(df_hratt$over_time, 
+                             levels = c("Yes", "No"))
+# This plot shows the proportion of attrition across each Over Time
+ggplot(df_hratt, aes(x = over_time, fill = attrition)) + 
+  geom_bar(position = "fill") +  # Show proportions
+  scale_fill_manual(values = c("lightgray", "blue")) + 
+  labs(title = "Attrition Probabilities by Over Time",
+       x = "Over Time",
+       y = "Proportion",
+       fill = "Attrition") +
+  theme_minimal(base_size = 15) +
+  theme(plot.title = element_text(size = 20),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 15))
+```
+The variable Overtime reveals a striking difference in attrition rates between employees who work overtime and those who do not. The bar chart indicates that employees working overtime (“Yes”) have an attrition rate nearly three times higher than those who do not (“No”) — approximately 0.30 compared to just 0.10. This suggests that overtime may be a significant contributing factor to employee turnover, potentially due to job-related stress, poor work-life balance, or feelings of being overworked.
+
+Based on these observations, the following hypotheses can be proposed:
+
+- **H0**: Employees who work overtime do not have a higher attrition rate compared to those who do not work overtime.
+
+- **H0**: Employees who work overtime have a higher attrition rate compared to those who do not work overtime. **<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create a contingency table between OverTime and Attrition
+table_ot_attr <- table(df_hratt$over_time, df_hratt$attrition)
+
+# Convert the table to a data frame for easier manipulation
+df_table <- as.data.frame(table_ot_attr)
+colnames(df_table) <- c("OverTime", "Attrition", "Count")
+
+# Summarize total counts and attrition counts by OverTime status
+summary_table <- df_table %>%
+  group_by(OverTime) %>%
+  summarise(Total = sum(Count)) %>%
+  left_join(
+    df_table %>% filter(Attrition == "Yes") %>% select(OverTime, Attrition_Yes = Count),
+    by = "OverTime"
+  ) %>%
+  left_join(
+    df_table %>% filter(Attrition == "No") %>% select(OverTime, Attrition_No = Count),
+    by = "OverTime"
+  ) %>%
+  mutate(
+    Attrition_Rate = round(Attrition_Yes / Total, 3)  # Calculate attrition rate
+  ) %>%
+  select(
+    OverTime, Total, Attrition_Yes, Attrition_No, Attrition_Rate
+  )
+
+# Display the summary table nicely formatted for R Markdown
+kable(summary_table, 
+      col.names = c("OverTime", "Total", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+      caption = "Attrition by OverTime Status",
+      digits = 3,
+      align = "c")
+
+# Perform Chi-squared test for independence
+chisq_test <- chisq.test(table_ot_attr)
+
+# Print test results and interpret significance
+print(chisq_test)
+```
+The Chi-squared test with Yates' correction shows a statistic of X-squared = 87.564, with 1 degree of freedom and a p-value < 2.2e-16, which is much smaller than the significance level of 0.05. Therefore, we reject the null hypothesis (H₀) and have sufficient evidence to conclude that employees who work overtime have a significantly higher attrition rate compared to those who do not.
+
+Specifically, the attrition rate among overtime employees is 30.5%, while the attrition rate among non-overtime employees is only 10.4%, indicating that the attrition rate in the overtime group is nearly three times higher than the other group.
+
+#### 1.3.2. Distance From Home
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+# Divide distance_from_home into 10 equal-sized groups (deciles)
+df_hratt_grouped <- df_hratt %>%
+  mutate(dfh_bin = ntile(distance_from_home, 10)) %>%
+  group_by(dfh_bin) %>%
+  summarise(attrition_rate = mean(attrition == "Yes"))  # Calculate attrition rate for each dfh group
+
+# Calculate min and max distance_from_home for each decile
+dfh_ranges <- df_hratt %>%
+  mutate(dfh_bin = ntile(distance_from_home, 10)) %>%
+  group_by(dfh_bin) %>%
+  summarise(min_dfh = min(distance_from_home),
+            max_dfh = max(distance_from_home)) %>%
+  mutate(label = paste0(min_dfh, " – ", max_dfh))
+
+# Merge decile labels into grouped data
+df_hratt_grouped <- df_hratt_grouped %>%
+  left_join(dfh_ranges, by = "dfh_bin")
+
+# Bar chart: Attrition rate across dfh deciles with range labels
+p1 <- ggplot(df_hratt_grouped, aes(x = factor(dfh_bin), y = attrition_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Attrition Rate across Distance From Home Levels",
+       x = "Distance From Home Range (Deciles)",
+       y = "Attrition Rate") +
+  scale_x_discrete(labels = df_hratt_grouped$label) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(angle = 45, hjust = 1))  # rotate x-axis labels
+
+# Boxplot: Distribution of Distance From Home by Attrition
+p2 <- ggplot(df_hratt, aes(x = attrition, y = distance_from_home, fill = attrition)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("lightgray", "blue")) +
+  labs(title = "DFH Distribution by Attrition",
+       x = "Attrition",
+       y = "Distance From Home") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        legend.position = "none")
+
+# Arrange both plots side by side
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+The variable Distance From Home exhibits a positive correlation with attrition rate. The bar chart clearly shows that as the commuting distance increases, so does the likelihood of employee attrition. Employees living closer to the workplace (lower deciles) have significantly lower attrition rates compared to those living farther away (higher deciles). This suggests that long commuting distances may contribute to fatigue, reduced job satisfaction, or disruption of work-life balance. The boxplot further supports this pattern, with Q1, median, and Q3 values for the attrition group (Yes) all higher than those of the non-attrition group (No), indicating that employees who leave tend to live farther from the office.
+
+Based on these findings, the following hypotheses can be proposed:
+
+- **H0**: Distance from home has no effect on employee attrition.
+
+- **H1**: Employees who live farther from the workplace are more likely to leave.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Ensure binary outcome and numeric predictor
+df_hratt <- df_hratt %>%
+  mutate(attrition_binary = ifelse(attrition == "Yes", 1, 0))
+
+# Fit logistic regression model: Distance vs Attrition
+model_distance <- glm(attrition_binary ~ distance_from_home,
+                      data = df_hratt,
+                      family = binomial)
+
+# Display model summary
+summary(model_distance)
+```
+The logistic regression model shows that the variable `distance_from_home` has a positive and statistically significant effect on employee attrition (estimated coefficient = 0.0247, p-value = 0.00295 < 0.01). This indicates that as the distance from home to the workplace increases, the probability of an employee leaving the company also increases.
+
+Although the coefficient is not large, its significance at the 1% level highlights it as a potential risk factor in employee retention strategies. It is especially relevant for employees who commute long distances daily.
+
+#### 1.3.3. Business Travel
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+df_hratt$business_travel <- factor(df_hratt$business_travel, 
+                             levels = c("Non-Travel", "Travel_Rarely", "Travel_Frequently"))
+# This plot shows the proportion of attrition across each Business Travel
+ggplot(df_hratt, aes(x = business_travel, fill = attrition)) + 
+  geom_bar(position = "fill") +  # Show proportions
+  scale_fill_manual(values = c("lightgray", "blue")) + 
+  labs(title = "Attrition Probabilities by Business Travel",
+       x = "Business Travel",
+       y = "Proportion",
+       fill = "Attrition") +
+  theme_minimal(base_size = 15) +
+  theme(plot.title = element_text(size = 20),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 15))
+```
+The variable Business Travel shows a positive correlation between travel frequency and attrition rate. Specifically, the bar chart indicates that employees who rarely travel for business have an attrition rate of around 0.10, while those who frequently travel exhibit a much higher attrition rate — approximately 0.25. This increase suggests that frequent work-related travel may negatively impact employees’ commitment to the organization.
+
+Based on these observations, several hypotheses can be proposed:
+
+- **H0**: There is no relationship between business travel frequency (`business_travel`) and employee attrition rate.
+
+- **H1**: The higher the frequency of business travel, the higher the employee attrition rate.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Convert business_travel to ordered factor
+df_hratt <- df_hratt %>%
+  mutate(
+    attrition_binary = ifelse(attrition == "Yes", 1, 0),
+    business_travel_ord = factor(business_travel,
+                                 levels = c("Non_Travel", "Travel_Rarely", "Travel_Frequently"),
+                                 ordered = TRUE)
+  )
+
+# Fit logistic regression model
+model_travel <- glm(attrition_binary ~ business_travel_ord,
+                    data = df_hratt,
+                    family = binomial)
+
+# Show model summary
+summary(model_travel)
+```
+The logistic regression results show that the variable `business_travel` (frequency of business travel) has a positive and highly statistically significant effect on the likelihood of employee attrition (estimate = 0.4487, p-value = 0.000107 < 0.001). This means that as the frequency of business travel increases, the probability of employees leaving the company also increases.
+
+#### 1.3.4. Work Life Balance
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+df_hratt$work_life_balance <- factor(df_hratt$work_life_balance, 
+                             levels = c("Bad", "Good", "Better", "Best"))
+# This plot shows the proportion of attrition across each Work Life Balance
+ggplot(df_hratt, aes(x = work_life_balance, fill = attrition)) + 
+  geom_bar(position = "fill") +  # Show proportions
+  scale_fill_manual(values = c("lightgray", "blue")) + 
+  labs(title = "Attrition Probabilities by Work Life Balance",
+       x = "Work Life Balance",
+       y = "Proportion",
+       fill = "Attrition") +
+  theme_minimal(base_size = 15) +
+  theme(plot.title = element_text(size = 20),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 15))
+```
+The Work Life Balance variable demonstrates a significant influence on employee attrition. The bar chart reveals that employees who rated their work-life balance as "Bad" have the highest attrition rate — around 0.30. In contrast, those who rated it as "Good", "Better", or "Best" exhibit substantially lower attrition rates, hovering around 0.15. This indicates that employees' perception of support in balancing work and personal life is a critical factor in retention.
+
+Based on these findings, several hypotheses can be proposed:
+
+- **H0**: The attrition rate of employees with work_life_balance = "Bad" is not higher than other groups.
+
+- **H1**:* Employees with work_life_balance = "Bad" have a higher attrition rate.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create a binary variable: "Bad" vs "Others" for work life balance
+df_hratt <- df_hratt %>%
+  mutate(
+    work_life_balance_bad = ifelse(work_life_balance == "Bad", "Bad", "Others"),
+    attrition_binary = ifelse(attrition == "Yes", 1, 0)
+  )
+
+# Create contingency table between work life balance group and attrition
+table_wlb_attrition <- table(df_hratt$work_life_balance_bad, df_hratt$attrition)
+
+# Summarize counts and attrition rates by work life balance group
+summary_table <- df_hratt %>%
+  group_by(work_life_balance_bad) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3)
+  )
+
+# Display the summary table with formatting
+summary_table %>%
+  kable(
+    col.names = c("Work Life Balance Group", "Total Employees", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+    caption = "Attrition Rate by Work Life Balance Group (Bad vs Others)"
+  ) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+# Perform Chi-square test to check if attrition rate differs by work life balance group
+chi_result <- chisq.test(table_wlb_attrition)
+
+# Print the Chi-square test result
+print(chi_result)
+```
+The test results show that employees who rate their work-life balance as "Bad" have a significantly higher attrition rate compared to other groups (31.2% vs. 15.3%). The Chi-squared test (X² = 13.158, p-value = 0.0002862) indicates that this difference is statistically significant, thus rejecting the null hypothesis.
+
+### 1.4. Performance Management
+#### 1.4.1. Performance Rating
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+df_hratt$performance_rating <- factor(df_hratt$performance_rating, 
+                             levels = c("Low", "Good", "Excellent", "Outstanding"))
+# This plot shows the proportion of attrition across each Work Life Balance
+ggplot(df_hratt, aes(x = performance_rating, fill = attrition)) + 
+  geom_bar(position = "fill") +  # Show proportions
+  scale_fill_manual(values = c("lightgray", "blue")) + 
+  labs(title = "Attrition Probabilities by Performance Rating",
+       x = "Performance Rating",
+       y = "Proportion",
+       fill = "Attrition") +
+  theme_minimal(base_size = 15) +
+  theme(plot.title = element_text(size = 20),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 15))
+```
+The Performance Rating variable does not show a clear difference in attrition rates between groups. The chart illustrates that both primary groups — "Excellent" and "Outstanding" — have similar attrition rates, around 0.15, with negligible variation. This suggests that current performance evaluations may not be a strong factor influencing employee attrition.
+
+Based on this, we can draw the following conclusions:
+
+- The Performance Rating may not accurately reflect actual job performance or may not be effectively used for differentiating between employees.
+- The variable might suffer from skewed distribution (e.g., most employees falling into just one or two categories), reducing its analytical value.
+
+#### 1.4.2. Job Involvement
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+df_hratt$job_involvement <- factor(df_hratt$job_involvement, 
+                             levels = c("Low", "Medium", "High", "Very High"))
+# This plot shows the proportion of attrition across each Job Involvement
+ggplot(df_hratt, aes(x = job_involvement, fill = attrition)) + 
+  geom_bar(position = "fill") +  # Show proportions
+  scale_fill_manual(values = c("lightgray", "blue")) + 
+  labs(title = "Attrition Probabilities by Job Involvement",
+       x = "Job Involvement",
+       y = "Proportion",
+       fill = "Attrition") +
+  theme_minimal(base_size = 15) +
+  theme(plot.title = element_text(size = 20),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 15))
+```
+The Job Involvement variable shows a clear relationship with attrition rates. Employees with low job involvement have the highest attrition rate, around 0.30, whereas those with very high involvement show a much lower rate, approximately 0.10. This downward trend suggests that job engagement and commitment play a critical role in employee retention.
+
+From this observation, we can derive the following hypotheses:
+
+- **H0**: There is no relationship between job involvement level and employee attrition.
+
+- **H1**: Lower levels of job involvement are associated with higher attrition rates.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Ensure job_involvement is ordered from Low to Very High
+df_hratt <- df_hratt %>%
+  mutate(job_involvement = factor(job_involvement,
+                                  levels = c("Low", "Medium", "High", "Very High"),
+                                  ordered = TRUE))
+
+# Contingency table
+table_involvement_attrition <- table(df_hratt$job_involvement, df_hratt$attrition)
+
+# Chi-Square Test (suitable for categorical vs categorical)
+chisq_result <- chisq.test(table_involvement_attrition)
+
+# Summary Table with counts and attrition rate
+summary_involvement <- df_hratt %>%
+  group_by(job_involvement) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3)
+  )
+
+# Display summary table
+summary_involvement %>%
+  kable(col.names = c("Job Involvement", "Total", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+        caption = "Attrition Summary by Job Involvement Level") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Print chi-square test result
+chisq_result
+```
+The results of the Chi-squared test indicate that the difference in attrition rates across job involvement levels is statistically significant, with a p-value = 2.86e-06, which is well below the 0.001 significance threshold. This allows us to reject the null hypothesis (H₀) and accept the alternative hypothesis (H₁): Employees with lower levels of job involvement tend to have a higher likelihood of attrition.
+
+#### 1.4.3. Job Satisfaction
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+df_hratt$job_satisfaction <- factor(df_hratt$job_satisfaction, 
+                             levels = c("Low", "Medium", "High", "Very High"))
+# This plot shows the proportion of attrition across each Job Satisfaction
+ggplot(df_hratt, aes(x = job_satisfaction, fill = attrition)) + 
+  geom_bar(position = "fill") +  # Show proportions
+  scale_fill_manual(values = c("lightgray", "blue")) + 
+  labs(title = "Attrition Probabilities by Job Satisfaction",
+       x = "Job Satisfaction",
+       y = "Proportion",
+       fill = "Attrition") +
+  theme_minimal(base_size = 15) +
+  theme(plot.title = element_text(size = 20),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 15))
+```
+The Job Satisfaction variable shows a clear inverse correlation with attrition: as job satisfaction increases, the attrition rate decreases. Specifically, employees with the lowest level of satisfaction ("Low") exhibit the highest attrition rate, around 0.23, while those with "Very High" satisfaction have a significantly lower rate, below 0.125. This trend highlights a strong link between job satisfaction and employees' likelihood to stay.
+
+Based on these findings, we can propose the following hypotheses:
+
+- **H0**: There is no relationship between job satisfaction level and employee attrition.
+
+- **H1**: Lower levels of job satisfaction are associated with higher attrition rates.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Ensure job_satisfaction is ordered from Low to Very High
+df_hratt <- df_hratt %>%
+  mutate(job_satisfaction = factor(job_satisfaction,
+                                   levels = c("Low", "Medium", "High", "Very High"),
+                                   ordered = TRUE))
+
+# Create contingency table between job satisfaction and attrition
+table_satisfaction_attrition <- table(df_hratt$job_satisfaction, df_hratt$attrition)
+
+# Perform Chi-Square Test
+chisq_result <- chisq.test(table_satisfaction_attrition)
+
+# Create summary table with attrition rates
+summary_satisfaction <- df_hratt %>%
+  group_by(job_satisfaction) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3)
+  )
+
+# Display formatted summary table
+summary_satisfaction %>%
+  kable(col.names = c("Job Satisfaction", "Total Employees", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+        caption = "Attrition Summary by Job Satisfaction Level") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Print chi-square test result
+chisq_result
+```
+The Chi-squared test yielded a p-value of 0.0005563, which is less than the conventional significance level of 0.05. This indicates that the differences in attrition rates among different satisfaction levels are statistically significant. Therefore, we reject the null hypothesis (H₀) and accept the alternative hypothesis (H₁): Lower job satisfaction is associated with a higher likelihood of attrition.
+
+### 1.5. Employee Engagement & Support
+#### 1.5.1. Relationship Satisfaction
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+df_hratt$relationship_satisfaction <- factor(df_hratt$relationship_satisfaction, 
+                             levels = c("Low", "Medium", "High", "Very High"))
+# This plot shows the proportion of attrition across each Relationship Satisfaction
+ggplot(df_hratt, aes(x = relationship_satisfaction, fill = attrition)) + 
+  geom_bar(position = "fill") +  # Show proportions
+  scale_fill_manual(values = c("lightgray", "blue")) + 
+  labs(title = "Attrition Probabilities by Relationship Satisfaction",
+       x = "Relationship Satisfaction",
+       y = "Proportion",
+       fill = "Attrition") +
+  theme_minimal(base_size = 15) +
+  theme(plot.title = element_text(size = 20),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 15))
+```
+The Relationship Satisfaction variable clearly reflects the connection between the quality of workplace relationships and employee attrition. Employees with low satisfaction in workplace relationships have the highest attrition rate, approximately 0.23, while the Medium, High, and Very High groups remain relatively stable at around 0.13. This gap suggests that relationship satisfaction—whether with peers, managers, or the workplace environment—has a significant impact on retention.
+
+Based on this observation, the following hypotheses can be proposed:
+
+- **H0**: There is no association between relationship satisfaction level and employee attrition.
+
+- **H1**: Employees with "Low" relationship satisfaction have a higher likelihood of attrition compared to those with higher satisfaction levels.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create a binary variable: Low vs Others (Medium, High, Very High)
+df_hratt <- df_hratt %>%
+  mutate(relationship_group = ifelse(relationship_satisfaction == "Low", "Low", "Others"))
+
+# Create a contingency table between relationship satisfaction group and attrition
+table_relationship <- table(df_hratt$relationship_group, df_hratt$attrition)
+
+# Summarize total employees and attrition rate by relationship satisfaction group
+summary_relationship <- df_hratt %>%
+  group_by(relationship_group) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3)
+  )
+
+# Display the summary table
+summary_relationship %>%
+  kable(col.names = c("Relationship Satisfaction", "Total", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+        caption = "Attrition Summary by Relationship Satisfaction Group") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Perform Chi-square test (recommended for large sample sizes)
+chisq_result <- chisq.test(table_relationship)
+
+# Display the test result
+chisq_result
+```
+The Chi-squared test with Yates' continuity correction yielded a p-value of 0.029, which is less than the conventional significance level of 0.05. Therefore, we reject the null hypothesis (H₀) and accept the alternative hypothesis (H₁): there is a statistically significant association between relationship satisfaction and attrition.
+
+Specifically, employees with low relationship satisfaction tend to have a higher attrition rate compared to those with higher levels of satisfaction.
+
+#### 1.5.2. Environment Satisfaction
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+df_hratt$environment_satisfaction <- factor(df_hratt$environment_satisfaction, 
+                             levels = c("Low", "Medium", "High", "Very High"))
+# This plot shows the proportion of attrition across each Environment Satisfaction
+ggplot(df_hratt, aes(x = environment_satisfaction, fill = attrition)) + 
+  geom_bar(position = "fill") +  # Show proportions
+  scale_fill_manual(values = c("lightgray", "blue")) + 
+  labs(title = "Attrition Probabilities by Environment Satisfaction",
+       x = "Environment Satisfaction",
+       y = "Proportion",
+       fill = "Attrition") +
+  theme_minimal(base_size = 15) +
+  theme(plot.title = element_text(size = 20),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.title = element_text(size = 15),
+        legend.text = element_text(size = 15))
+```
+The Environment Satisfaction variable demonstrates a significant relationship between employees’ satisfaction with their work environment and attrition rates. Specifically, employees reporting low satisfaction have the highest attrition rate, around 0.25, whereas those in Medium, High, and Very High satisfaction groups show a marked decrease, stabilizing around 0.125. This indicates that the work environment—including physical conditions, space, safety, and overall working conditions—plays a crucial role in employee retention.
+
+From this observation, the following hypotheses can be made:
+
+- **H0**: There is no association between environment satisfaction level and employee attrition.
+
+- **H1**: Employees with "Low" environment satisfaction have a higher likelihood of attrition compared to those with higher satisfaction levels.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create a binary variable: Low vs Others (Medium, High, Very High)
+df_hratt <- df_hratt %>%
+  mutate(environment_group = ifelse(environment_satisfaction == "Low", "Low", "Others"))
+
+# Create a contingency table between environment satisfaction and attrition
+table_environment <- table(df_hratt$environment_group, df_hratt$attrition)
+
+# Summarize total employees and attrition rate by environment satisfaction group
+summary_environment <- df_hratt %>%
+  group_by(environment_group) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3)
+  )
+
+# Display the summary table
+summary_environment %>%
+  kable(
+    col.names = c("Environment Satisfaction", "Total Employees", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+    caption = "Attrition Summary by Environment Satisfaction"
+  ) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Perform Chi-square test (suitable for large sample sizes)
+chisq_result_env <- chisq.test(table_environment)
+
+# Show Chi-square test result
+chisq_result_env
+```
+The Chi-squared test with Yates' continuity correction returned a p-value of 3.854e-06, which is significantly below the standard significance level of 0.05. This result allows us to reject the null hypothesis (H₀) and accept the alternative hypothesis (H₁): there is a statistically significant association between environment satisfaction and employee attrition.
+
+Specifically, employees who are dissatisfied with their work environment tend to have a higher attrition rate compared to those with higher levels of satisfaction.
+
+### 1.6. Recruitment & Onboarding
+#### 1.6.1. Num Companies Worked
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+# Group by unique num_companies_worked values and calculate attrition rate
+df_hratt_grouped <- df_hratt %>%
+  group_by(num_companies_worked) %>%
+  summarise(attrition_rate = mean(attrition == "Yes")) %>%
+  arrange(num_companies_worked)
+
+# Bar chart: Attrition rate by number of companies worked
+p1 <- ggplot(df_hratt_grouped, aes(x = factor(num_companies_worked), y = attrition_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Attrition Rate by Number of Companies Worked",
+       x = "Number of Companies Worked",
+       y = "Attrition Rate") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14))
+
+# Boxplot: Distribution of num_companies_worked by attrition
+p2 <- ggplot(df_hratt, aes(x = attrition, y = num_companies_worked, fill = attrition)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("lightgray", "blue")) +
+  labs(title = "Number of Companies Worked Distribution by Attrition",
+       x = "Attrition",
+       y = "Number of Companies Worked") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        legend.position = "none")
+
+# Arrange both plots side by side
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+The analysis of the chart shows that employees who have never worked at another company (Num Companies Worked = 0) have a relatively low average attrition rate, indicating relative stability within this group. In contrast, employees who have worked at one previous company exhibit a significantly higher attrition rate, suggesting that those with one prior job change may be less stable or still seeking better opportunities.
+
+Employees with experience at 2 to 4 companies show relatively low and stable attrition rates, possibly reflecting a group with moderate experience who balance engagement and career development well.
+
+Meanwhile, the group with 5 or more previous companies shows relatively high and variable attrition rates, indicating a tendency for frequent job changes and potentially greater difficulty in retention. This could be due to personal traits favoring change or an ongoing search for a better long-term fit.
+
+The boxplot analysis further reveals that the lower quartile (Q1) of both attrition and retention groups is similar, but the median attrition group is lower while the upper quartile (Q3) is higher than that of the retention group, indicating greater diversity in the work history of those who leave.
+
+From this observation, the following hypotheses can be made:
+
+- **H0**: There is no significant difference in attrition rates across groups based on the number of companies previously worked for (0, 1, 2–4, 5+).
+
+- **H1**: There is a significant difference in attrition rates across groups based on the number of companies previously worked for.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create grouped variable based on hypothesis
+df_hratt <- df_hratt %>%
+  mutate(company_group = case_when(
+    num_companies_worked == 0 ~ "0 Companies",
+    num_companies_worked == 1 ~ "1 Company",
+    num_companies_worked >= 2 & num_companies_worked <= 4 ~ "2–4 Companies",
+    num_companies_worked >= 5 ~ "5+ Companies"
+  ))
+
+# Create contingency table
+table_companies_attrition <- table(df_hratt$company_group, df_hratt$attrition)
+
+# Perform Chi-squared test
+chisq_result <- chisq.test(table_companies_attrition)
+
+# Summarize counts and attrition rate
+summary_table <- df_hratt %>%
+  group_by(company_group) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3),
+    .groups = 'drop'
+  )
+
+# Display summary table
+summary_table %>%
+  kable(col.names = c("Company Group", "Total", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+        caption = "Attrition Summary by Number of Companies Worked") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Print chi-squared test result
+print(chisq_result)
+```
+The result of the Chi-squared test (p-value = 0.00008779 < 0.05) indicates a statistically significant difference in attrition rates across employee groups based on the number of companies they have previously worked for. Therefore, we reject the null hypothesis (H₀) and accept the alternative hypothesis (H₁): the number of previous employers is associated with an employee's likelihood of leaving the current organization.
+
+This finding suggests that individuals who have switched jobs frequently (5 or more companies) may have developed a pattern of not committing to one organization for an extended period. They might be more accustomed to frequent changes in their work environment, which could make them more likely to leave the current company when challenges arise or new opportunities appear.
+
+On the other hand, employees who have worked for only one company before may also exhibit high attrition rates. This could stem from a lack of experience in adapting to new work environments. They may struggle to adjust to differences in organizational culture, management style, or operational processes, leading to feelings of misalignment or disappointment compared to initial expectations. Additionally, transitioning from a stable environment to a new one could result in cultural shock or change-related stress, making it easier for them to consider leaving the company.
+
+In contrast, employees with experience working for 2–4 companies may have gained sufficient exposure to different environments, helping them better understand their career expectations, develop adaptability to change, and select organizations that align with their preferences. As a result, they tend to be more stable and demonstrate greater commitment to their current organization.
+
+#### 1.6.2. Years At Company
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+# Divide years_at_company into 10 equal-sized groups (deciles)
+df_hratt_grouped <- df_hratt %>%
+  mutate(yac_bin = ntile(years_at_company, 10)) %>%
+  group_by(yac_bin) %>%
+  summarise(attrition_rate = mean(attrition == "Yes"))  # Calculate attrition rate for each yac group
+
+# Calculate min and max years_at_company for each decile
+yac_ranges <- df_hratt %>%
+  mutate(yac_bin = ntile(years_at_company, 10)) %>%
+  group_by(yac_bin) %>%
+  summarise(min_yac = min(years_at_company),
+            max_yac = max(years_at_company)) %>%
+  mutate(label = paste0(min_yac, " – ", max_yac, " yrs"))
+
+# Merge decile labels into grouped data
+df_hratt_grouped <- df_hratt_grouped %>%
+  left_join(yac_ranges, by = "yac_bin")
+
+# Bar chart: Attrition rate across yac deciles with range labels
+p1 <- ggplot(df_hratt_grouped, aes(x = factor(yac_bin), y = attrition_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Attrition Rate across YAC Levels",
+       x = "Years At Company Range (Deciles)",
+       y = "Attrition Rate") +
+  scale_x_discrete(labels = df_hratt_grouped$label) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(angle = 45, hjust = 1))  # rotate x-axis labels
+
+# Boxplot: Distribution of Years At Company by Attrition
+p2 <- ggplot(df_hratt, aes(x = attrition, y = years_at_company, fill = attrition)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("lightgray", "blue")) +
+  labs(title = "YAC Distribution by Attrition",
+       x = "Attrition",
+       y = "Years At Company") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        legend.position = "none")
+
+# Arrange both plots side by side
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+The variable Years At Company demonstrates a clear downward trend in attrition rate as tenure increases. The bar chart reveals that employees with the shortest tenure—especially those in decile 1—have an attrition rate approaching 0.25, whereas those with the longest tenure in decile 10 exhibit a much lower attrition rate of approximately 0.1. This consistent decline across deciles suggests that the length of time an employee has been with the company plays a significant role in their decision to stay or leave. The boxplot reinforces this observation: Q1, median, and Q3 of the attrition group (Yes) are all lower than those of the non-attrition group (No), indicating that employees who leave tend to have shorter tenures.
+
+Based on this analysis, the following hypotheses can be proposed:
+
+- **H0**:There is no relationship in the attrition rate with respect to the number of years worked at the company
+
+- **H1**:The longer the Years At Company, the lower the attrition rate.**<span style="color: red;">FALSE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Convert attrition to binary (Yes = 1, No = 0)
+df_hratt <- df_hratt %>%
+  mutate(attrition_binary = ifelse(attrition == "Yes", 1, 0))
+
+# Perform Wilcoxon rank-sum test (non-parametric test)
+wilcox_result <- wilcox.test(years_at_company ~ attrition, data = df_hratt, alternative = "less")
+
+# Summarize median years_at_company by attrition group
+summary_table <- df_hratt %>%
+  group_by(attrition) %>%
+  summarise(
+    Count = n(),
+    Median_Years = median(years_at_company),
+    Mean_Years = round(mean(years_at_company), 2),
+    .groups = "drop"
+  )
+
+# Display summary table
+summary_table %>%
+  kable(col.names = c("Attrition", "Total", "Median Years at Company", "Mean Years at Company"),
+        caption = "Summary of Years at Company by Attrition Group") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Print test result
+print(wilcox_result)
+```
+The analysis results indicate that there is no statistically significant relationship between the number of years an employee has worked at the company and their likelihood of leaving. Although employees who left the company had a lower median tenure (3 years compared to 6 years) and a lower mean tenure (5.13 years compared to 7.37 years), the Wilcoxon test produced a p-value of 1, which is considerably greater than the significance threshold of 0.05.
+
+This means there is insufficient evidence to reject the null hypothesis (H₀). In other words, it cannot be concluded that longer tenure at the company reduces the likelihood of attrition.
+
+- **H0**: There is no difference in attrition rates between employees with 0–3 years of tenure and those with ≥4 years at the company.
+
+- **H1**: Employees with 0–3 years of tenure have a higher attrition rate compared to those with 4 or more years.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create a binary variable: 0–3 years vs. >3 years
+df_hratt <- df_hratt %>%
+  mutate(years_group = ifelse(years_at_company <= 3, "0-3 years", "Over 3 years"))
+
+# Create contingency table
+table_years_attrition <- table(df_hratt$years_group, df_hratt$attrition)
+
+# Perform Chi-squared test
+chi_result <- chisq.test(table_years_attrition)
+
+# Summarize attrition rate by years_group
+summary_table <- df_hratt %>%
+  group_by(years_group) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3),
+    .groups = "drop"
+  )
+
+# Display summary table
+summary_table %>%
+  kable(col.names = c("Years at Company Group", "Total Employees", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+        caption = "Attrition Summary by Years at Company Group") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Print Chi-squared test result
+print(chi_result)
+```
+The Chi-squared test results indicate a statistically significant relationship between the number of years worked at the company and the attrition rate (p-value < 0.001). Specifically, employees who have worked at the company for 0–3 years have a substantially higher attrition rate (26%) compared to those who have stayed for more than 3 years (11.5%).
+
+This reflects a common organizational reality: the risk of attrition is typically higher during the early stages of employment, when employees have not yet formed strong attachments to the company, are still evaluating the work environment, or have not had their initial expectations met. In contrast, those who remain beyond three years have generally overcome early challenges and tend to be more stable.
+
+This result also helps explain why the earlier Wilcoxon test did not detect a clear relationship when analyzing continuous years of service — but when categorizing the data into specific groups, the differences become evident and statistically significant.
+
+#### 1.6.3. Years With Current Manager
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+# Divide years_with_curr_manager into 10 equal-sized groups (deciles)
+df_hratt_grouped <- df_hratt %>%
+  mutate(ywcm_bin = ntile(years_with_curr_manager, 10)) %>%
+  group_by(ywcm_bin) %>%
+  summarise(attrition_rate = mean(attrition == "Yes"))
+
+# Calculate min and max years_with_curr_manager for each decile
+ywcm_ranges <- df_hratt %>%
+  mutate(ywcm_bin = ntile(years_with_curr_manager, 10)) %>%
+  group_by(ywcm_bin) %>%
+  summarise(min_ywcm = min(years_with_curr_manager),
+            max_ywcm = max(years_with_curr_manager)) %>%
+  mutate(label = paste0(min_ywcm, " – ", max_ywcm, " yrs"))
+
+# Merge decile labels into grouped data
+df_hratt_grouped <- df_hratt_grouped %>%
+  left_join(ywcm_ranges, by = "ywcm_bin")
+
+# Bar chart: Attrition rate across ywcm deciles with range labels
+p1 <- ggplot(df_hratt_grouped, aes(x = factor(ywcm_bin), y = attrition_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Attrition Rate across YWCM Levels",
+       x = "Years With Current Manager Range (Deciles)",
+       y = "Attrition Rate") +
+  scale_x_discrete(labels = df_hratt_grouped$label) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Boxplot: Distribution of Years With Current Manager by Attrition
+p2 <- ggplot(df_hratt, aes(x = attrition, y = years_with_curr_manager, fill = attrition)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("lightgray", "blue")) +
+  labs(title = "YWCM Distribution by Attrition",
+       x = "Attrition",
+       y = "Years With Current Manager") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(size = 18),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        legend.position = "none")
+
+# Arrange both plots side by side
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+The variable Years with Current Manager shows a clear relationship between the length of time an employee has worked with their current manager and their likelihood of attrition. The bar chart reveals that employees in deciles 1 and 2—those who have only recently started working with their manager—have a notably high attrition rate of approximately 0.3. This rate drops sharply to around 0.14 by decile 3 and then fluctuates slightly between 0.175 and close to 0.1 in the following deciles, before a modest increase to about 0.16 in decile 10.
+
+The boxplot supports this trend: the Q1, median, and Q3 values for the attrition group (Yes) are all lower than those for the non-attrition group (No), suggesting that employees who leave tend to have had shorter working relationships with their current managers.
+
+From these findings, we can propose the following hypotheses:
+
+- **H0**: There is no difference in attrition rates between employees who have worked with their current manager for 0–1 year and those who have worked for ≥2 years.
+
+- **H1**: Employees who have worked with their current manager for 0–1 year have a higher attrition rate compared to those with ≥2 years.**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create a new variable: manager_tenure_group
+df_hratt <- df_hratt %>%
+  mutate(manager_tenure_group = ifelse(years_with_curr_manager <= 1, "0-1 years", "2+ years"))
+
+# Create a contingency table
+table_mgr_attrition <- table(df_hratt$manager_tenure_group, df_hratt$attrition)
+
+# Perform Chi-square test
+chisq_mgr_result <- chisq.test(table_mgr_attrition)
+
+# Summarize attrition rate by manager tenure group
+summary_mgr <- df_hratt %>%
+  group_by(manager_tenure_group) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_No = sum(attrition == "No"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3),
+    .groups = "drop"
+  )
+
+# Display summary table
+summary_mgr %>%
+  kable(col.names = c("Manager Tenure Group", "Total Employees", "Attrition = Yes", "Attrition = No", "Attrition Rate"),
+        caption = "Attrition Summary by Manager Tenure Group") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Print chi-square test result
+print(chisq_mgr_result)
+```
+The Chi-squared test results indicate a statistically significant difference in attrition rates between two groups of employees based on the length of time working with their direct manager (p-value < 0.001). Specifically, employees who have worked with their current manager for only 0–1 year show a much higher attrition rate (28.3%) compared to those who have worked with their manager for 2 years or more (12.5%).
+
+This suggests that the length of the employee-manager relationship may play an important role in employee retention. Newly formed relationships with managers may not yet have had sufficient time to build trust, support, and mutual understanding.
+
+## 2. In-depth Feature Exploration
+### 2.1. Compensation & Rewards
+### 2.1.1. Monthly Income (Identifying Employee Segments Sensitive to Income and Attrition)
+
+- **H0**: The minimum salary (2696) does not affect the attrition rate in any employee group categorized by job level and years of service.
+
+- **H1**: The minimum salary (2696) affects the attrition rate in at least one employee group categorized by job level and years of service. **<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create groups for years_at_company based on updated ranges
+df_hratt <- df_hratt %>%
+  mutate(years_group = case_when(
+    years_at_company <= 3 ~ "0–3",
+    years_at_company <= 5 ~ "4–5",
+    TRUE ~ "6+"
+  ))
+
+# Combine job_level and years_group into one label
+df_hratt <- df_hratt %>%
+  mutate(group_combo = paste0("Level ", job_level, ", Years ", years_group))
+
+# Create dataframe to store results
+results <- data.frame(Group = character(),
+                      p_value = numeric(),
+                      odds_ratio = numeric(),
+                      stringsAsFactors = FALSE)
+
+# Loop through each group
+group_levels <- unique(df_hratt$group_combo)
+
+for (g in group_levels) {
+  sub_df <- df_hratt %>% filter(group_combo == g)
+  
+  sub_df <- sub_df %>%
+    mutate(income_group = ifelse(monthly_income < 2696, "<2696", "≥2696"))
+  
+  if (length(unique(sub_df$income_group)) == 2 && length(unique(sub_df$attrition)) == 2) {
+    table_income <- table(sub_df$income_group, sub_df$attrition)
+    
+    fisher_test <- fisher.test(table_income)
+    
+    results <- rbind(results, data.frame(
+      Group = g,
+      p_value = fisher_test$p.value,
+      odds_ratio = fisher_test$estimate
+    ))
+  }
+}
+
+# Create a new column for formatted Group name (bold if p < 0.05)
+results <- results %>%
+  mutate(
+    Group_fmt = ifelse(p_value < 0.05,
+                       cell_spec(Group, bold = TRUE),
+                       Group)
+  )
+
+# Display full table with bold highlights
+results %>%
+  mutate(p_value = round(p_value, 4),
+         odds_ratio = round(odds_ratio, 4)) %>%
+  select(Group = Group_fmt, p_value, odds_ratio) %>%
+  kable("html", escape = FALSE, caption = "Attrition vs. Income by Subgroup") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=10}
+# Create a grouped variable for years_at_company with updated ranges
+df_hratt <- df_hratt %>%
+  mutate(years_group = case_when(
+    years_at_company <= 3 ~ "0–3",
+    years_at_company <= 5 ~ "4–5",
+    TRUE ~ "6+"
+  ))
+
+# Combine job_level and years_group into a single grouping variable
+df_hratt <- df_hratt %>%
+  mutate(group_combo = paste0("Level ", job_level, ", Years ", years_group),
+         income_group = ifelse(monthly_income < 2696, "<2696", "≥2696"))
+
+# Calculate attrition rate by each group and income level
+plot_data <- df_hratt %>%
+  group_by(group_combo, income_group) %>%
+  summarise(attrition_rate = mean(attrition == "Yes"),
+            count = n(),
+            .groups = "drop")
+
+# Plot attrition rate by income group for each combination group
+ggplot(plot_data, aes(x = income_group, y = attrition_rate, fill = income_group)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ group_combo, ncol = 3) +
+  labs(title = "Fisher's Exact Test: Attrition Rate by Income Group in Each Subgroup",
+       x = "Income Group",
+       y = "Attrition Rate") +
+  scale_fill_manual(values = c("<2696" = "orange", "≥2696" = "steelblue")) +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        legend.position = "bottom",
+        plot.title = element_text(size = 16, face = "bold"))
+```
+The test results show that only the group of employees at the **JUNIOR LEVEL WITH LESS THAN 3 YEARS OF SERVICE** has a statistically significant association between the minimum salary of 2696 and the attrition rate (p-value = 0.0147), with an odds ratio of approximately 0.5191. This indicates that this salary level may reduce the attrition rate in this group. 
+
+Other groups do not show clear statistically significant results (p-value > 0.05 or undefined odds ratio due to insufficient data). 
+
+This suggests that the impact of the minimum salary of 2696 on employee retention depends heavily on job level and years of service, being particularly effective for the **JUNIOR LEVEL WITH LESS THAN 3 YEARS OF SERVICE** group.
+
+### 2.1.2. Stock Option Level (Analyzing the Joint Impact of Stock Options and Marital Status on Attrition)
+- **H0**: There is no significant difference in the effect of Stock Option Level on Attrition across different Marital Status groups (i.e., the effect of stock options is the same regardless of marital status).
+
+- **H1**: There is a significant difference in the effect of Stock Option Level on Attrition among different Marital Status groups (i.e., an interaction effect exists).**<span style="color: green;">TRUE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Perform Fisher's Exact Test by Marital Status
+results <- df_hratt %>%
+  mutate(stock_option_group = factor(stock_option_level)) %>%
+  group_by(marital_status) %>%
+  group_modify(~{
+    tbl <- table(.x$stock_option_group, .x$attrition)
+    test <- fisher.test(tbl)
+    # Check if odds ratio and conf.int exist
+    odds_ratio <- if(!is.null(test$estimate)) test$estimate else NA_real_
+    conf_low <- if(!is.null(test$conf.int)) test$conf.int[1] else NA_real_
+    conf_high <- if(!is.null(test$conf.int)) test$conf.int[2] else NA_real_
+    tibble(
+      marital_status = unique(.x$marital_status),
+      p_value = test$p.value,
+      odds_ratio = odds_ratio,
+      conf_low = conf_low,
+      conf_high = conf_high,
+      Significant = test$p.value < 0.05
+    )
+  })
+
+# Format results
+results %>%
+  mutate(
+    label = ifelse(Significant, paste0("**", marital_status, "**"), marital_status),
+    p_value = round(p_value, 4),
+    odds_ratio = round(odds_ratio, 3),
+    CI = ifelse(!is.na(conf_low) & !is.na(conf_high),
+                paste0("[", round(conf_low, 3), ", ", round(conf_high, 3), "]"), NA_character_),
+    Significant = ifelse(Significant, "**Yes**", "No")
+  ) %>%
+  select(Marital_Status = label, p_value, odds_ratio, CI, Significant) %>%
+  kable(caption = "Fisher's Exact Test: Attrition ~ Stock Option Level by Marital Status", align = "c") %>%
+  kable_styling(full_width = FALSE)
+```
+The results of Fisher’s Exact Test conducted for each Marital Status group indicate that only the **Married** group shows a statistically significant association between Stock Option Level and Attrition (**p-value = 0.0014**, which is below the significance threshold of 0.05). In contrast, the Divorced and Single groups do not show statistically significant results (p-values = 0.0504 and 1.0000, respectively).
+
+Therefore, there is sufficient evidence to reject the null hypothesis and accept the alternative hypothesis: the effect of stock options on attrition differs across Marital Status groups, with a **particularly significant effect observed in the Married group**. This suggests that being married may increase sensitivity to long-term retention policies such as stock options.
+
+### 2.2. Career Development & Advancement
+### 2.2.1. Identifying Promotion-Related Attrition Drivers (Job Level, Promotion, and Role Tenure vs. Attrition)
+#### 2.2.1.1. Exploratory Visualization of Promotion-Related Attrition Patterns
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8}
+# Group years_since_last_promotion into bins with consistent naming style
+df_hratt <- df_hratt %>%
+  mutate(promo_group = case_when(
+    years_since_last_promotion <= 3 ~ "0–3 Years",
+    years_since_last_promotion <= 5 ~ "4–5 Years",
+    TRUE ~ "6+ Years"
+  ))
+
+# Calculate attrition rate by job_level and promo_group
+plot_data_promo <- df_hratt %>%
+  group_by(job_level, promo_group) %>%
+  summarise(
+    total = n(),
+    attrition_yes = sum(attrition == "Yes"),
+    attrition_rate = attrition_yes / total
+  ) %>%
+  ungroup()
+
+# Plot attrition rate by years since last promotion, faceted by job_level
+ggplot(plot_data_promo, aes(x = promo_group, y = attrition_rate)) +
+  geom_col(fill = "steelblue", show.legend = FALSE) +
+  facet_wrap(~ job_level, ncol = 2) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  labs(
+    title = "Attrition Rate by Years Since Last Promotion Across Job Levels",
+    x = "Years Since Last Promotion",
+    y = "Attrition Rate"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10)
+  )
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8}
+# Group years_in_current_role into bins with consistent naming style
+df_hratt <- df_hratt %>%
+  mutate(years_group = case_when(
+    years_in_current_role <= 3 ~ "0–3 Years",
+    years_in_current_role >= 4 & years_in_current_role <= 5 ~ "4–5 Years",
+    years_in_current_role >= 6 ~ "6+ Years"
+  ))
+
+# Calculate attrition rate by years_group and job_level
+plot_data_years <- df_hratt %>%
+  group_by(job_level, years_group) %>%
+  summarise(
+    total = n(),
+    attrition_yes = sum(attrition == "Yes"),
+    attrition_rate = attrition_yes / total
+  ) %>%
+  ungroup()
+
+# Plot attrition rate by years in current role, faceted by job_level
+ggplot(plot_data_years, aes(x = years_group, y = attrition_rate)) +
+  geom_col(fill = "steelblue", show.legend = FALSE) +
+  facet_wrap(~ job_level, ncol = 2) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(
+    title = "Attrition Rate by Years in Current Role Across Job Levels",
+    x = "Years in Current Role",
+    y = "Attrition Rate"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10)
+  )
+```
+The analysis of attrition rates based on Years Since Last Promotion and Years in Current Role, segmented by Job Level, reveals **non-uniform patterns across different groups**.
+
+In the Junior group — the one with the highest attrition rate — the rate is typically high during the first three years, drops during years 4–5, and then rises again from year 6 onward. In contrast, other job levels do not exhibit a clear increasing or decreasing trend over time.
+
+This suggests that the impact of **promotion wait time** or **tenure in the same role** on attrition decisions **depends heavily on job level**. Therefore, **employee retention policies should be tailored specifically for each job level**, rather than applying a one-size-fits-all solution.
+
+#### 2.2.1.2. Logistic Regression to Quantify the Impact of Promotion Factors on Attrition
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(car)
+
+# Prepare data with groupings
+df_hratt <- df_hratt %>%
+  mutate(
+    attrition_binary = ifelse(attrition == "Yes", 1, 0),
+    job_level_group = ifelse(job_level == "Junior", "Junior", "Others"),
+    years_since_last_promotion_group = case_when(
+      years_since_last_promotion <= 3 ~ "0-3",
+      years_since_last_promotion <= 5 ~ "4-5",
+      TRUE ~ "6+"
+    ),
+    years_in_current_role_group = case_when(
+      years_in_current_role <= 3 ~ "0-3",
+      years_in_current_role <= 5 ~ "4-5",
+      TRUE ~ "6+"
+    ),
+    # Convert to factor
+    job_level_group = factor(job_level_group),
+    years_since_last_promotion_group = factor(years_since_last_promotion_group, levels = c("0-3", "4-5", "6+")),
+    years_in_current_role_group = factor(years_in_current_role_group, levels = c("0-3", "4-5", "6+"))
+  )
+
+# Fit logistic regression model with interactions
+model <- glm(attrition_binary ~ 
+               job_level_group * years_since_last_promotion_group + 
+               job_level_group * years_in_current_role_group + 
+               years_since_last_promotion_group * years_in_current_role_group,
+             data = df_hratt, family = binomial)
+
+# View model summary
+summary(model)
+
+# Convert log-odds coefficients to Odds Ratios
+exp(coef(model))
+```
+In this step, a logistic regression analysis was conducted to examine the potential interaction effects between three promotion-related variables—**Job Level**, **Years Since Last Promotion**, and **Years in Current Role**—on the likelihood of employee attrition. The objective was to determine whether combinations of these factors help identify high-risk employee groups more clearly, thus enabling more targeted retention strategies.
+
+The results reaffirm that **Job Level** remains the most influential predictor, with a highly significant coefficient estimate of **-1.107 (p < 0.001)**, corresponding to an **odds ratio of approximately 0.33**. This indicates that employees who are not in the Junior group (i.e., classified as “Others”) are only about **33% as likely to leave** as Junior-level employees, reinforcing the conclusion that lower-level staff are at the highest risk of attrition.
+
+In contrast, the effects of **Years Since Last Promotion** and **Years in Current Role** were weaker and statistically less robust. For example, employees who have not been promoted for **6+ years** showed an elevated attrition risk (**odds ratio ≈ 2.63**), but the associated **p-value = 0.1158** suggests this effect is not statistically significant. Similarly, employees who have remained in the same role for **4–6 years** showed reduced likelihood of leaving (**odds ratio < 0.5**), with the **4–5 years group reaching statistical significance (p = 0.0356)**.
+
+Notably, when interaction terms between the three variables were included in the model, none reached statistical significance. Terms such as `years_since_last_promotion_group4-5:years_in_current_role_group6+` or `job_level_groupOthers:years_since_last_promotion_group6+` had **p-values greater than 0.5**, indicating that **individual variable effects dominate**, and combinations of these variables did not yield clearer patterns of risk.
+
+In summary, when quantifying the influence of promotion-related factors on attrition, **Job Level** consistently emerges as the most critical factor. While **Years Since Last Promotion** and **Years in Current Role** provide supplementary insights, their interaction effects do not significantly enhance the predictive power of the model. These findings suggest that **retention programs should prioritize Junior-level employees**, particularly those who **have not been promoted in a long time** or who **have been stagnant in the same role for several years**.
+
+#### 2.2.1.3. Identifying High-Risk Employee Segments for Targeted Retention Strategies
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create grouped variables
+df_hratt <- df_hratt %>%
+  mutate(
+    income_group = ifelse(monthly_income < 2696, "Below_2696", "Above_2696"),
+    current_role_group = case_when(
+      years_in_current_role <= 3 ~ "0–3 years",
+      years_in_current_role <= 5 ~ "4–5 years",
+      TRUE ~ "6+ years"
+    ),
+    promo_group = case_when(
+      years_since_last_promotion <= 3 ~ "0–3 years",
+      years_since_last_promotion <= 5 ~ "4–5 years",
+      TRUE ~ "6+ years"
+    )
+  )
+
+# Summarize attrition by group
+summary_table <- df_hratt %>%
+  group_by(current_role_group, promo_group, job_level, income_group) %>%
+  summarise(
+    total = n(),
+    attrition_yes = sum(attrition == "Yes"),
+    attrition_rate = round(attrition_yes / total, 3),
+    .groups = "drop"
+  )
+
+# Reshape to wide format
+comparison_table <- summary_table %>%
+  pivot_wider(
+    names_from = income_group,
+    values_from = c(total, attrition_yes, attrition_rate),
+    names_glue = "{.value}_{income_group}"
+  )
+
+# Handle missing columns gracefully (e.g., if one group has no data)
+comparison_table <- comparison_table %>%
+  mutate(
+    attrition_rate_Below_2696 = coalesce(attrition_rate_Below_2696, 0),
+    attrition_rate_Above_2696 = coalesce(attrition_rate_Above_2696, 0),
+    attrition_yes_Below_2696 = coalesce(attrition_yes_Below_2696, 0),
+    attrition_rate_diff = attrition_rate_Below_2696 - attrition_rate_Above_2696
+  ) %>%
+  filter(attrition_yes_Below_2696 > 10, attrition_rate_diff > 0.05) %>%
+  arrange(desc(attrition_rate_diff))
+
+# Display table
+comparison_table %>%
+  mutate(
+    `Attrition Rate (Below 2696)` = percent(attrition_rate_Below_2696, accuracy = 0.1),
+    `Attrition Rate (Above 2696)` = percent(attrition_rate_Above_2696, accuracy = 0.1),
+    `Attrition Rate Gap` = percent(attrition_rate_diff, accuracy = 0.1)
+  ) %>%
+  select(
+    `Years in Current Role` = current_role_group,
+    `Years Since Last Promotion` = promo_group,
+    `Job Level` = job_level,
+    `Total (Below 2696)` = total_Below_2696,
+    `Attrition = Yes (Below 2696)` = attrition_yes_Below_2696,
+    `Attrition Rate (Below 2696)`,
+    `Total (Above 2696)` = total_Above_2696,
+    `Attrition = Yes (Above 2696)` = attrition_yes_Above_2696,
+    `Attrition Rate (Above 2696)`,
+    `Attrition Rate Gap`
+  ) %>%
+  kable(
+    caption = "Employee Segments Most Sensitive to Low Income (Monthly Income < 2696)",
+    col.names = c("Years in Current Role", "Years Since Last Promotion", "Job Level",
+                  "Total (Below 2696)", "Attrition = Yes (Below 2696)", "Attrition Rate (Below 2696)",
+                  "Total (Above 2696)", "Attrition = Yes (Above 2696)", "Attrition Rate (Above 2696)",
+                  "Attrition Rate Gap")
+  ) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+```
+The analysis reveals that **junior employees with 0–3 years in their current role and 0–3 years since their last promotion** are the most sensitive to low income. Within this group, those earning **below 2696** exhibit an attrition rate of **34.0%**, compared to **21.4%** among their counterparts earning above that threshold — a notable gap of **12.6 percentage points**.
+
+This suggests that **low salary levels significantly intensify attrition risk** for early-career employees who are still building experience and awaiting advancement. These individuals may perceive **limited financial reward and growth opportunities**, leading to disengagement.
+
+Addressing this issue may require:
+- **More competitive entry-level compensation**
+- **Clearer promotion timelines**
+- **Early developmental support**
+
+These interventions can help retain emerging talent and reduce premature turnover in this critical group.
+
+### 2.2.2. Identifying Training-Related Attrition Drivers (Training Times Last Year, and Overtime vs. Attrition)
+
+- **H0**: There is no relationship or interaction effect between the number of training sessions per year and overtime status on employee attrition.
+
+- **H1**: Employees who work overtime tend to have less time to attend training sessions — i.e., there is a negative association between overtime and training frequency.**<span style="color: red;">FALSE</span>**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Convert relevant variables to factors
+df_hratt <- df_hratt %>%
+  mutate(
+    attrition_binary = ifelse(attrition == "Yes", 1, 0),
+    over_time = factor(over_time, levels = c("No", "Yes"))
+  )
+
+# Logistic regression model with interaction between training_times_last_year and over_time
+model_interaction <- glm(attrition_binary ~ training_times_last_year * over_time,
+                         data = df_hratt,
+                         family = binomial)
+
+# Show model summary
+summary(model_interaction)
+```
+The **overtime variable (over_timeYes)** has a **highly significant impact** on attrition, with an estimated coefficient of **1.324** (p-value = 0.000173). This means that employees who work overtime have a much higher risk of leaving compared to those who do not.
+
+The **number of training sessions in the past year (training_times_last_year)** shows **no clear effect** on attrition (p-value = 0.2259).
+
+Most importantly, the **interaction between training frequency and overtime (training_times_last_year:over_timeYes)** is **not statistically significant** (p-value = 0.963). This indicates there is no evidence that overtime reduces training participation or that their combined effect influences attrition.
+
+Although overtime increases the risk of attrition, the number of training sessions does not have a significant impact, nor does it interact with overtime in affecting attrition. Therefore, retention policies should focus on addressing overtime workload rather than worrying about its effect on training time.
+
+### 2.2. Work-Life Balance & Flexibility
+In this step, I examine the relationship between employee attrition and key variables associated with **Work-Life Balance and Flexibility**, including `OverTime_Bin`, `DistanceFromHome`, `BusinessTravel`, and `WorkLifeBalance`. Using a **logistic regression model** in combination with a **forest plot visualization**, this analysis aims to identify which factors have the most significant impact on attrition. The goal is to determine which variables should be prioritized in future **policy interventions** to effectively reduce employee turnover.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Convert attrition to binary numeric (0 = No, 1 = Yes)
+df_hratt <- df_hratt %>%
+  mutate(
+    attrition_binary = ifelse(attrition == "Yes", 1, 0),
+    over_time_bin = ifelse(over_time == "Yes", 1, 0),
+    # Make sure business_travel and work_life_balance are factors with correct order:
+    business_travel = factor(business_travel, levels = c("Non_Travel", "Travel_Rarely", "Travel_Frequently"), ordered = TRUE),
+    work_life_balance = factor(work_life_balance, levels = c("Bad", "Good", "Better", "Best"), ordered = TRUE)
+  )
+
+# Fit logistic regression model with all variables
+model <- glm(attrition_binary ~ over_time_bin + distance_from_home + business_travel + work_life_balance,
+             data = df_hratt, family = binomial())
+
+# Summarize model results
+summary(model)
+
+# Get Odds Ratios and 95% Confidence Intervals for easier interpretation
+tidy_model <- broom::tidy(model, exponentiate = TRUE, conf.int = TRUE)
+
+# Order variables by the absolute value of the estimate (log-odds scale)
+tidy_model <- tidy_model %>%
+  filter(term != "(Intercept)") %>%
+  arrange(desc(abs(estimate - 1)))
+
+# Show ordered effects
+print(tidy_model)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8}
+# Plot Odds Ratios with 95% Confidence Intervals
+ggplot(tidy_model, aes(x = reorder(term, estimate), y = estimate)) +
+  geom_point(size = 3, color = "steelblue") +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2, color = "darkgray") +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "red") +
+  coord_flip() +
+  labs(
+    title = "Effect of Factors on Employee Attrition",
+    x = "Predictor",
+    y = "Odds Ratio (OR)"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+Based on the results of the logistic regression model, the most influential factor affecting employee attrition is **OverTime**. Employees who work overtime are **3.73 times more likely** to leave the company compared to those who do not, and this relationship is **highly statistically significant** (**p < 0.001**).
+
+Next, **Work-Life Balance** also plays a significant role. Specifically, the **quadratic effect** of work-life balance indicates that employees with poorer balance have an approximately **1.92 times higher** risk of attrition (**p ≈ 0.001**). Additionally, the **linear effect** of work-life balance is protective: as employees perceive improvements in work-life balance, their risk of leaving **decreases** (**odds ratio = 0.58**, **p ≈ 0.023**).
+
+The **Business Travel** variable also shows a clear effect: employees who frequently travel for work have about a **1.59 times higher** likelihood of quitting compared to those who travel less or not at all (**p ≈ 0.0001**).
+
+Finally, although the impact of **Distance From Home** is smaller, it is still statistically significant. For every additional kilometer in commuting distance, the risk of attrition increases slightly by about **2%** (**odds ratio = 1.02**, **p ≈ 0.017**).
+
+Summary: Ranking of Impact from Most to Least Significant
+**OverTime** > **Work-Life Balance** > **Business Travel** > **Distance From Home**
+
+This suggests that managing **overtime**, supporting **work-life balance**, and reviewing **business travel policies** can play an important role in reducing employee turnover.
+
+### 2.3. Employee Engagement & Support
+In this step, I conduct a **logistic regression** analysis to explore how the interaction between **Relationship Satisfaction** and **Years Since Last Promotion** (grouped into 0–3 years, 4–5 years, and 6+ years) influences employee attrition. The goal is to uncover actionable insights for designing retention policies tailored to different promotion timelines and satisfaction levels.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create new categorical variables
+df_hratt <- df_hratt %>%
+  mutate(
+    # Convert relationship satisfaction to binary: "Low" vs "Others"
+    relationship_group = ifelse(relationship_satisfaction == "Low", "Low", "Others"),
+    
+    # Group promotion years into categories
+    promotion_group = case_when(
+      years_since_last_promotion <= 3 ~ "0-3 years",
+      years_since_last_promotion <= 5 ~ "4-5 years",
+      TRUE ~ "6+ years"
+    ),
+    
+    # Convert attrition to binary variable for logistic regression
+    attrition_binary = ifelse(attrition == "Yes", 1, 0)
+  )
+
+# Convert grouping variables to factors with reference levels
+df_hratt$relationship_group <- factor(df_hratt$relationship_group, levels = c("Others", "Low"))
+df_hratt$promotion_group <- factor(df_hratt$promotion_group, levels = c("0-3 years", "4-5 years", "6+ years"))
+
+# Fit logistic regression model with interaction effect
+model_policy <- glm(attrition_binary ~ relationship_group * promotion_group,
+                    data = df_hratt, family = binomial)
+
+#  Display model summary
+summary(model_policy)
+
+# Show odds ratios with confidence intervals
+tidy(model_policy, exponentiate = TRUE, conf.int = TRUE)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8}
+# Create promotion and relationship satisfaction groups
+df_plot <- df_hratt %>%
+  mutate(
+    # Group relationship satisfaction into 'Low' and 'Others'
+    relationship_group = ifelse(relationship_satisfaction == "Low", "Low", "Others"),
+    
+    # Group years since last promotion into 3 categories
+    promotion_group = case_when(
+      years_since_last_promotion <= 3 ~ "0-3 years",
+      years_since_last_promotion <= 5 ~ "4-5 years",
+      TRUE ~ "6+ years"
+    )
+  ) %>%
+  group_by(relationship_group, promotion_group) %>%
+  summarise(
+    total = n(),
+    attrition_yes = sum(attrition == "Yes"),
+    attrition_rate = round(attrition_yes / total, 3),
+    .groups = 'drop'
+  )
+
+# Visualize attrition rate with specified colors
+ggplot(df_plot, aes(x = promotion_group, y = attrition_rate, fill = relationship_group)) +
+  geom_col(position = position_dodge()) +
+  geom_text(aes(label = scales::percent(attrition_rate)), 
+            position = position_dodge(width = 0.9), vjust = -0.5, size = 3) +
+  labs(
+    title = "Attrition Rate by Promotion Group and Relationship Satisfaction",
+    x = "Years Since Last Promotion Group",
+    y = "Attrition Rate",
+    fill = "Relationship Satisfaction"
+  ) +
+  scale_fill_manual(values = c("Low" = "blue", "Others" = "gray70")) +  # Blue for Low, gray for Others
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme_minimal()
+```
+The results from the logistic regression model indicate a **notable interaction** between relationship satisfaction at the workplace and the duration since the last promotion in predicting employee attrition.
+
+Employees in the **"Low" relationship satisfaction** group are more likely to leave the organization compared to other groups.  
+This is indicated by a **positive and marginally significant coefficient** with a p-value of **0.06857**.
+
+Employees who have **not been promoted in the past 4–5 years** exhibit a **lower probability of attrition** compared to those who were promoted more recently.  
+The coefficient is **negative and statistically significant (p = 0.00423)**.
+
+The **most notable result** lies in the **interaction between the "Low" relationship satisfaction group and the "promotion group = 4–5 years"**:  
+The interaction term has a **positive and statistically significant coefficient** (p = **0.02951**), indicating that when **both factors** are present—low relationship satisfaction and a lack of promotion in the past 4–5 years—the **risk of attrition increases significantly**.
+
+In contrast, the interaction between **"relationship satisfaction = Low"** and **"promotion group = 6+ years"** is **not statistically significant** (p = **0.56368**), implying **no meaningful increase** in attrition risk for this group compared to the reference category.
+
+These findings suggest that **dissatisfaction in workplace relationships becomes a pronounced risk factor for attrition**, especially when **combined with a perceived stagnation in career advancement during the 4–5 year window**. This period may represent a **critical psychological threshold** where employee expectations are unmet, potentially leading to decreased motivation or decisions to leave the organization.
+
+### 2.4. Recruitment & Onboarding
+### 2.4.1. Profiling High-Risk Hires Based on Career History and Job Level
+In this step, I perform a logistic regression analysis to examine the relationship between **Number of Companies Worked**, **Total Working Years**, **Job Level**, and **Attrition**. The goal is to identify whether certain combinations of career history and job seniority are associated with higher attrition risk. By exploring interaction effects among these variables, I aim to pinpoint the most at-risk employee profiles, providing insights to inform more targeted recruitment and onboarding strategies.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Create grouped variables
+df_hratt <- df_hratt %>%
+  mutate(
+    num_companies_group = case_when(
+      num_companies_worked == 0 ~ "0",
+      num_companies_worked == 1 ~ "1",
+      num_companies_worked >= 2 & num_companies_worked <= 4 ~ "2-4",
+      num_companies_worked >= 5 ~ "5+"
+    ),
+    total_years_group = case_when(
+      total_working_years <= 5 ~ "0-5",
+      total_working_years > 5 & total_working_years <= 10 ~ "6-10",
+      total_working_years > 10 ~ "11+"
+    ),
+    job_level = as.factor(job_level),
+    attrition_binary = ifelse(attrition == "Yes", 1, 0)
+  )
+
+# Run logistic regression with interaction terms
+logit_model <- glm(
+  attrition_binary ~ num_companies_group * total_years_group * job_level,
+  data = df_hratt,
+  family = "binomial"
+)
+
+# Extract significant terms (p < 0.05)
+sig_terms <- tidy(logit_model) %>%
+  filter(p.value < 0.05) %>%
+  arrange(p.value)
+
+# Display significant interaction effects
+sig_terms %>%
+  kable(caption = "Significant Interactions Influencing Attrition",
+        col.names = c("Term", "Estimate", "Std. Error", "z value", "p-value")) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Calculate attrition rate per group
+df_summary <- df_hratt %>%
+  group_by(num_companies_group, total_years_group, job_level) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(Attrition_Rate))
+
+# Display top groups by attrition rate
+df_summary %>%
+  filter(Attrition_Yes > 30, Attrition_Rate > 0.10) %>%
+  kable(caption = "High Attrition Rate Groups with Practical Significance",
+        col.names = c("Num Companies", "Working Years", "Job Level", "Total", "Attrition = Yes", "Attrition Rate")) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+```
+One significant interaction emerged: employees who had worked at **5 or more companies** showed a **statistically significant increase in attrition risk** (Estimate = 1.34, p = 0.0258). This finding supports the notion that frequent job changes may reflect or reinforce a behavioral pattern of lower organizational commitment, making such individuals more prone to leaving future employers.
+
+From a practical standpoint, the group with the highest attrition rate consisted of employees who had only worked at **1 company**, had **0–5 years** of total experience, and were in **junior-level** positions. Among 181 individuals in this category, 60 had left the organization, resulting in an attrition rate of 33.1%—significantly higher than the average. This suggests that less experienced employees who have limited exposure to different work environments and are early in their careers may struggle more with organizational fit or adapting to new roles, despite appearing stable based on their limited job history.
+
+### 2.4.2. Evaluating Early Tenure Risk Factors in Relation to Manager Fit and Career Stage
+In this step, I investigate the interaction between **Years at Company**, **Job Level**, and **Years with Current Manager** in relation to Attrition using **logistic regression**. This analysis aims to identify which employee groups—based on their tenure with the company and manager, as well as their job seniority—are most likely to leave. I also assess the statistical significance of these patterns to ensure that the insights are reliable for guiding retention-focused onboarding strategies.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Data preparation: create grouped variables and binary attrition
+df_hratt <- df_hratt %>%
+  mutate(
+    years_at_company_group = case_when(
+      years_at_company <= 3 ~ "0-3",
+      TRUE ~ "4+"
+    ),
+    years_with_curr_manager_group = case_when(
+      years_with_curr_manager <= 1 ~ "0-1",
+      TRUE ~ "2+"
+    ),
+    job_level = as.factor(job_level),
+    attrition_binary = ifelse(attrition == "Yes", 1, 0)
+  )
+
+# Logistic regression to assess interaction effects
+logit_model <- glm(
+  attrition_binary ~ years_at_company_group * job_level * years_with_curr_manager_group,
+  data = df_hratt,
+  family = "binomial"
+)
+
+# Extract and show statistically significant interaction terms
+sig_terms <- tidy(logit_model) %>%
+  filter(p.value < 0.05) %>%
+  arrange(p.value)
+
+sig_terms %>%
+  kable(caption = "Significant Interaction Effects on Attrition",
+        col.names = c("Term", "Estimate", "Std. Error", "z value", "p-value")) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+
+# Summarize attrition by group combinations
+df_summary <- df_hratt %>%
+  group_by(years_at_company_group, job_level, years_with_curr_manager_group) %>%
+  summarise(
+    Total = n(),
+    Attrition_Yes = sum(attrition == "Yes"),
+    Attrition_Rate = round(Attrition_Yes / Total, 3),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(Attrition_Rate))
+
+# Show high-attrition groups: Attrition > 30 employees and > 10% rate
+df_summary %>%
+  filter(Attrition_Yes > 30, Attrition_Rate > 0.10) %>%
+  kable(caption = "High-Attrition Employee Groups",
+        col.names = c("Years at Company", "Job Level", "Years with Manager", "Total", "Attrition = Yes", "Attrition Rate")) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+```
+The analysis revealed several statistically significant effects. Employees who had **worked with their current manager for 2 or more years** were significantly **less likely to leave** (Estimate = -0.94, p < 0.001), emphasizing the value of stable manager-employee relationships in reducing attrition. Similarly, **mid-level** employees showed a much **lower likelihood of leaving** compared to junior staff (Estimate = -1.25, p < 0.01), suggesting that greater job experience and organizational embeddedness can act as retention buffers.
+
+From a practical standpoint, the most vulnerable group comprised employees with **0–3 years at the company**, in **junior-level** positions, and with only **0–1 year under their current manager**. Among 154 individuals in this category, 65 had left, resulting in a 42.2% attrition rate—the highest observed. In contrast, **junior** employees with **4+ years at the company** and **2+ years with their manager** had a much **lower attrition rate** of 18.3%, highlighting how both organizational and managerial tenure help foster stability.
+
+These findings underscore the importance of early relationship-building between junior employees and their managers. Investing in consistent leadership support during the first years of employment may significantly reduce turnover risk in this vulnerable group.
+
+## 3. Which Factors Matter Most in Designing Attrition Reduction Strategies
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8}
+# Convert target to factor
+df_hratt$attrition_factor <- factor(df_hratt$attrition)
+
+# Recode variables as specified
+df_model <- df_hratt %>%
+  mutate(
+    monthly_income_group = ifelse(monthly_income < 2696, "<2696", ">=2696"),
+    stock_option_group = ifelse(stock_option_level == 0, "0", ">0"),
+    job_level_group = ifelse(job_level == "Junior", "Junior", "Others"),
+    years_since_last_promotion_group = case_when(
+      years_since_last_promotion <= 3 ~ "0-3",
+      years_since_last_promotion <= 5 ~ "4-5",
+      TRUE ~ "6+"
+    ),
+    training_times_group = ifelse(training_times_last_year == 0, "0", ">0"),
+    years_in_current_role_group = ifelse(years_in_current_role <= 3, "0-3", "4+"),
+    work_life_balance_group = ifelse(work_life_balance == "Bad", "Bad", "Greater"),
+    job_involvement_group = ifelse(job_involvement == "Low", "Low", "Greater"),
+    job_satisfaction_group = ifelse(job_satisfaction == "Low", "Low", "Greater"),
+    relationship_satisfaction_group = ifelse(relationship_satisfaction == "Low", "Low", "Greater"),
+    environment_satisfaction_group = ifelse(environment_satisfaction == "Low", "Low", "Greater"),
+    num_companies_group = case_when(
+      num_companies_worked == 1 ~ "1",
+      num_companies_worked >= 5 ~ "5+",
+      TRUE ~ "Others"
+    ),
+    years_at_company_group = ifelse(years_at_company <= 3, "0-3", "4+"),
+    years_with_curr_manager_group = ifelse(years_with_curr_manager <= 1, "0-1", "2+")
+  ) %>%
+  select(
+    attrition_factor,
+    monthly_income_group,
+    stock_option_group,
+    job_level_group,
+    years_since_last_promotion_group,
+    training_times_group,
+    years_in_current_role_group,
+    over_time,
+    distance_from_home,
+    business_travel,
+    work_life_balance_group,
+    job_involvement_group,
+    job_satisfaction_group,
+    relationship_satisfaction_group,
+    environment_satisfaction_group,
+    num_companies_group,
+    years_at_company_group,
+    years_with_curr_manager_group
+  ) %>%
+  na.omit()
+
+# Train Random Forest model
+set.seed(123)
+rf_model <- train(
+  attrition_factor ~ .,
+  data = df_model,
+  method = "ranger",
+  trControl = trainControl(method = "cv", number = 5),
+  importance = 'permutation'
+)
+
+# Extract and sort importance values
+imp_df <- vip::vi(rf_model) %>%
+  arrange(desc(Importance)) %>%
+  mutate(
+    Cumulative = cumsum(Importance / sum(Importance)),
+    Rank = row_number()
+  )
+
+# Determine Pareto 70% cutoff (top factors contributing to 70% importance)
+pareto_cutoff <- imp_df %>%
+  filter(Cumulative >= 0.7) %>%
+  slice(1) %>%
+  pull(Rank)
+
+# Plot top 15 important variables with Pareto 70% line
+ggplot(imp_df[1:15, ], aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  geom_vline(
+    xintercept = 15 - pareto_cutoff + 1,  # adjust for flipped coordinates
+    linetype = "dashed",
+    color = "darkblue",
+    size = 1.2
+  ) +
+  annotate("text", 
+           x = 15 - pareto_cutoff + 1 + 0.5, 
+           y = max(imp_df$Importance) * 0.9,
+           label = "Pareto 70% Line", 
+           hjust = 0, 
+           color = "darkblue",
+           fontface = "bold") +
+  labs(
+    title = "Key Factors for Designing Attrition Reduction Policies",
+    x = "Variables",
+    y = "Importance (Permutation)"
+  )
+```
+
+The chart above illustrates the importance of various factors in predicting employee attrition, as analyzed using a **Random Forest** model. This step aims to highlight the key areas that should be prioritized when developing strategies to reduce employee turnover.
+
+The analysis reveals that **working overtime (over_timeYes)** is the most influential factor, indicating a strong correlation between frequent overtime and the likelihood of attrition. This suggests that prolonged job-related stress can lead to burnout and ultimately drive employees to leave the organization.
+
+Following that, **being in a non-mainstream job level group (job_level_groupOthers)** also shows a significant impact. Employees outside the common career progression framework may feel a lack of clear direction or recognition, increasing their risk of leaving.
+
+Another highly important factor is **earning a monthly income at or above the median (monthly_income_group ≥ 2696)**. Contrary to expectations, higher-income employees are not necessarily more likely to stay. Instead, they may have more external opportunities and bargaining power, which increases the likelihood of attrition.
+
+Additionally, **not having stock options (stock_option_group0)** and **low satisfaction with the work environment (environment_satisfaction_groupLow)** also rank high in importance. These findings highlight the role of financial incentives and emotional engagement in employee retention.
+
+Overall, the most critical factors influencing attrition can be grouped into three key categories:
+
+1. **Working conditions** – including overtime and the physical or emotional work environment.
+2. **Compensation and benefits** – such as salary level and stock options.
+3. **Personal perceptions and experiences** – including job involvement, satisfaction, and perceived career trajectory.
+
+This analysis provides a data-driven foundation for developing targeted employee retention strategies. However, since the findings are based on a public reference dataset (IBM HR Analytics Dataset on Kaggle), they should be interpreted with caution. The practical implementation of any recommendations should be adjusted to fit the specific organizational context and operational constraints.
