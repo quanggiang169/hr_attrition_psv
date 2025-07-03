@@ -25,7 +25,7 @@ Support HR policy decisions by uncovering key drivers of attrition and targeting
 ## 🧪 Analytical Approach
 
 - Exploratory Data Analysis (EDA)
-- Hypothesis Testing (Chi-Square, Fisher's Exact)
+- Hypothesis Testing (Chi-Square, Fisher's Exact, etc)
 - Segmented Insight Generation
 - Strategy Mapping & Lifecycle Heatmaps
 - Recommendations tailored by employee type
